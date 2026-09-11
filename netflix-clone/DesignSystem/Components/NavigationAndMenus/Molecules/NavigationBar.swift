@@ -118,6 +118,7 @@ struct NavigationBar: View {
                         : Color.Neutral.greyLight1 // ← ubah warna label inactive (lebih terang)
                 )
         }
+        .frame(maxWidth: .infinity) // ← semua item sama lebar (patokan: item terlebar)
         .padding(.horizontal, isActive ? Metrics.activeHorizontalPadding : Metrics.inactiveHorizontalPadding) // ← ubah padding horizontal
         .padding(.vertical, Metrics.verticalPadding) // ← ubah padding vertical
         .background(
@@ -155,12 +156,12 @@ private extension NavigationBar {
     enum Metrics {
         static let horizontalPadding: CGFloat = 8      // ← ubah padding horizontal items
         static let verticalPadding: CGFloat = 8         // ← ubah padding vertical items
-        static let itemSpacing: CGFloat = 4             // ← ubah gap antar item
+        static let itemSpacing: CGFloat = 6             // ← ubah gap antar item
         static let containerHorizontalPadding: CGFloat = 16 // ← ubah inset container kiri-kanan
         static let containerBottomPadding: CGFloat = 12 // ← ubah inset container bawah (lebih ke bawah)
         static let iconSize: CGFloat = 20               // ← ubah ukuran icon
         static let iconLabelSpacing: CGFloat = 4        // ← ubah gap icon-to-label
-        static let activeHorizontalPadding: CGFloat = 16 // ← ubah padding horizontal aktif (lebih panjang)
+        static let activeHorizontalPadding: CGFloat = 20 // ← ubah padding horizontal aktif (pill lebih lebar)
         static let inactiveHorizontalPadding: CGFloat = 8 // ← ubah padding horizontal inactive
     }
 }

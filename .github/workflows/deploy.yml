@@ -1,0 +1,104 @@
+name: Deploy Backend (Cloud Run)
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: Cloud Run region
+        required: false
+        default: asia-southeast2
+      seed_catalog:
+        description: Run `make seed` against the deployed project before deploy
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ inputs.region || 'asia-southeast2' }}
+  TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    # Skip silently (job succeeds) until the user adds secrets.
+    if: ${{ secrets.GCP_PROJECT_ID != '' && secrets.GCP_SA_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Seed streaming catalog
+        if: ${{ inputs.seed_catalog }}
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" > /tmp/gcp-key.json
+          FIREBASE_SERVICE_ACCOUNT_PATH=/tmp/gcp-key.json \
+          GCP_PROJECT_ID="$GCP_PROJECT_ID" \
+          TMDB_ACCESS_TOKEN="$TMDB_TOKEN" \
+          go run ./cmd/seed
+        working-directory: backend
+
+      - name: Docker auth
+        run: gcloud auth configure-docker --quiet gcr.io
+
+      - name: Build & push image
+        run: |
+          IMAGE="gcr.io/$GCP_PROJECT_ID/netflix-backend:latest"
+          gcloud builds submit backend/ --tag "$IMAGE" --quiet --project "$GCP_PROJECT_ID"
+
+      - name: Deploy API service
+        run: |
+          gcloud run deploy netflix-backend \
+            --image "gcr.io/$GCP_PROJECT_ID/netflix-backend:latest" \
+            --platform managed \
+            --region "$REGION" \
+            --allow-unauthenticated \
+            --set-env-vars "ENV=production,GCP_PROJECT_ID=$GCP_PROJECT_ID,TMDB_ACCESS_TOKEN=$TMDB_TOKEN" \
+            --project "$GCP_PROJECT_ID" \
+            --quiet
+
+      # Cron worker + Cloud Scheduler (optional). Uncomment once the TMDB proxy
+      # notifier is wanted in production; needs a scheduler service account.
+      # - name: Deploy cron service
+      #   run: |
+      #     gcloud run deploy netflix-backend-cron \
+      #       --image "gcr.io/$GCP_PROJECT_ID/netflix-backend:latest" \
+      #       --platform managed --region "$REGION" --allow-unauthenticated \
+      #       --no-cpu-throttling \
+      #       --set-env-vars "ENV=production,GCP_PROJECT_ID=$GCP_PROJECT_ID,TMDB_ACCESS_TOKEN=$TMDB_TOKEN,ROLE=cron" \
+      #       --args cron --project "$GCP_PROJECT_ID" --quiet
+      #
+      # - name: Create schedule
+      #   run: |
+      #     gcloud scheduler jobs create http netflix-episode-checker \
+      #       --schedule "0 6 * * 5" --uri "https://$REGION-$GCP_PROJECT_ID.cloudfunctions.net/netflix-backend-cron" \
+      #       --http-method GET --time-zone="Asia/Jakarta" \
+      #       --project "$GCP_PROJECT_ID" --quiet || true
+
+  skipped:
+    name: Skipped (missing secrets)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.GCP_PROJECT_ID == '' || secrets.GCP_SA_KEY == '' }}
+    steps:
+      - name: No-op
+        run: |
+          echo "::warning::Deploy skipped — set GCP_PROJECT_ID, GCP_SA_KEY and TMDB_TOKEN secrets to enable."
+          exit 0

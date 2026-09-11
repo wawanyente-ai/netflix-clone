@@ -14,6 +14,10 @@ import SwiftUI
 /// (`Button_And_Tabs/Molecules`) — no new button styling needed here,
 /// this just arranges three of them and owns the play/pause toggle.
 ///
+/// `onPlayPause` is called on the play/pause tap when provided (so the
+/// caller can drive the actual AVPlayer); the `isPlaying` binding stays a
+/// plain display state.
+///
 /// ```swift
 /// @State private var isPlaying = true
 /// VideoControlsBar(isPlaying: $isPlaying, size: .large, onSkipBack: {}, onSkipForward: {})
@@ -30,6 +34,7 @@ struct VideoControlsBar: View {
     var size: Size = .large
     var onSkipBack: () -> Void
     var onSkipForward: () -> Void
+    var onPlayPause: (() -> Void)? = nil // ← panggil saat tombol play/pause diklik
 
     // MARK: Body
 
@@ -40,7 +45,13 @@ struct VideoControlsBar: View {
                 variant: .skipBackward(size == .large ? .large : .small),
                 action: onSkipBack
             )
-            VideoControlButton(variant: playPauseVariant) { isPlaying.toggle() }
+            VideoControlButton(variant: playPauseVariant) {
+                if let onPlayPause {
+                    onPlayPause() // ← driver player asli
+                } else {
+                    isPlaying.toggle() // ← fallback display-only
+                }
+            }
             VideoControlButton(
                 variant: .skipForward(size == .large ? .large : .small),
                 action: onSkipForward

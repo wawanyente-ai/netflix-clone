@@ -29,6 +29,7 @@ struct VideoProgressBar: View {
     @Binding var progress: Double
     var size: Size = .large
     var timeLabel: String
+    var onSeek: (Double) -> Void = { _ in } // ← panggil saat drag selesai (ratio 0...1)
 
     // MARK: Body
 
@@ -71,7 +72,11 @@ private extension VideoProgressBar {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 let ratio = Double(value.location.x / width)
-                progress = min(max(ratio, 0), 1)
+                progress = min(max(ratio, 0), 1) // ← update preview progress
+            }
+            .onEnded { value in
+                let ratio = Double(value.location.x / width)
+                onSeek(min(max(ratio, 0), 1)) // ← seek ke posisi ini
             }
     }
 }

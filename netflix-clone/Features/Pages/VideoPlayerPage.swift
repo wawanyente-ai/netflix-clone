@@ -17,17 +17,23 @@ struct VideoPlayerPage: View {
     let episodeLabel: String
 
     var onCloseTap: () -> Void = {}
+    var onStartPlaying: (() -> Void)? = nil // ← log history (sekali per video)
+    var onProgressSave: ((Double, Double) -> Void)? = nil // ← (position, duration) → backend
 
     init(
         seriesTitle: String = "Demo Video",
         episodeLabel: String = "Big Buck Bunny",
         demoIndex: Int = 0,
-        onCloseTap: @escaping () -> Void = {}
+        onCloseTap: @escaping () -> Void = {},
+        onStartPlaying: (() -> Void)? = nil,
+        onProgressSave: ((Double, Double) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: VideoPlayerViewModel(demoIndex: demoIndex))
         self.seriesTitle = seriesTitle
         self.episodeLabel = episodeLabel
         self.onCloseTap = onCloseTap
+        self.onStartPlaying = onStartPlaying
+        self.onProgressSave = onProgressSave
     }
 
     var body: some View {
@@ -47,6 +53,9 @@ struct VideoPlayerPage: View {
             }
         )
         .onAppear {
+            viewModel.onProgressUpdate = onProgressSave // ← lapor progress ke backend
+            viewModel.onVideoStart = onStartPlaying // ← log history saat video mulai
+            Task { await viewModel.loadCatalog() } // ← refresh katalog dari backend
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 viewModel.togglePlay()
             }
@@ -56,66 +65,79 @@ struct VideoPlayerPage: View {
         }
     }
 
-    // MARK: - Portrait Player
+    // MARK: - Portrait Player (controls menyatu dengan video)
 
     private var portraitPlayer: some View {
         VStack(spacing: 0) {
-            // ← custom player (tanpa default controls)
-            if let player = viewModel.player {
-                ZStack {
+            // ← video full-width + overlay controls di atasnya
+            ZStack(alignment: .bottom) {
+                if let player = viewModel.player {
                     PlayerView(player: player)
-                        .frame(height: 220)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    // ← play button overlay (tap untuk play/pause)
-                    if !viewModel.isPlaying {
-                        Button {
-                            viewModel.togglePlay()
-                        } label: {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 40)) // ← ubah ukuran icon play
-                                .foregroundStyle(Color.Semantic.textPrimary)
-                                .frame(width: 80, height: 80) // ← ubah ukuran tombol
-                                .background(Color.Neutral.black.opacity(0.5)) // ← ubah warna background
-                                .clipShape(Circle())
-                        }
-                    }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Metrics.videoHeight) // ← ubah tinggi video
+                        .clipped()
+                        .contentShape(Rectangle())
+                        .onTapGesture { viewModel.togglePlay() } // ← tap video = play/pause
+                        .disabled(viewModel.isScrubbing)
+                } else {
+                    Color.Neutral.black
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Metrics.videoHeight)
                 }
-            } else {
-                Color.Neutral.black
-                    .frame(height: 220)
+
+                // ← gradient biar kontrol kebaca
+                LinearGradient(
+                    colors: [.clear, Color.Neutral.black.opacity(0.7)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: Metrics.videoHeight)
+
+                // ← top bar: judul + fullscreen
+                VStack {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(seriesTitle)
+                                .font(.Typography.Bold.label1)
+                                .foregroundStyle(Color.Semantic.textPrimary)
+                                .lineLimit(1)
+                            Text(episodeLabel)
+                                .font(.Typography.Medium.caption1)
+                                .foregroundStyle(Color.Semantic.textSecondary)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        fullscreenButton(intoLandscape: true) // ← tombol fullscreen
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                    Spacer()
+
+                    // ← center controls (overlay di video)
+                    VideoControlsBar(
+                        isPlaying: $viewModel.isPlaying,
+                        size: .large,
+                        onSkipBack: { viewModel.skipBackward() },
+                        onSkipForward: { viewModel.skipForward() },
+                        onPlayPause: { viewModel.togglePlay() } // ← driver player asli
+                    )
+                    .padding(.bottom, 8)
+
+                    // ← progress bar (menempel di tepi bawah video)
+                    VideoProgressBar(
+                        progress: progressBinding,
+                        size: .large,
+                        timeLabel: viewModel.currentTime,
+                        onSeek: { ratio in
+                            viewModel.seekTo(ratio) // ← seek via timeline
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                }
             }
-
-            // ← video info
-            VStack(alignment: .leading, spacing: 8) {
-                Text(seriesTitle)
-                    .font(.Typography.Bold.label1)
-                    .foregroundStyle(Color.Semantic.textPrimary)
-
-                Text(episodeLabel)
-                    .font(.Typography.Medium.caption1)
-                    .foregroundStyle(Color.Semantic.textSecondary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-
-            // ← custom playback controls
-            VideoControlsBar(
-                isPlaying: $viewModel.isPlaying,
-                size: .large,
-                onSkipBack: { viewModel.skipBackward() },
-                onSkipForward: { viewModel.skipForward() }
-            )
-            .padding(.top, 16)
-
-            // ← progress bar
-            VideoProgressBar(
-                progress: $viewModel.progress,
-                size: .large,
-                timeLabel: viewModel.currentTime
-            )
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .frame(height: Metrics.videoHeight)
 
             // ← demo video picker
             demoVideoPicker
@@ -124,7 +146,7 @@ struct VideoPlayerPage: View {
 
             Spacer()
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, 0)
     }
 
     // MARK: - Landscape Player
@@ -138,32 +160,109 @@ struct VideoPlayerPage: View {
             }
 
             VStack {
-                VideoPlayerTopBar(
-                    title: episodeLabel,
-                    onCastTap: {},
-                    onCloseTap: onCloseTap
-                )
+                HStack {
+                    // ← collapse fullscreen (kembali portrait)
+                    fullscreenButton(intoLandscape: false)
+                    Spacer()
+                    Text(episodeLabel)
+                        .font(.Typography.Medium.label3)
+                        .foregroundStyle(Color.Neutral.white)
+                        .lineLimit(1)
+                    Spacer()
+                    VideoControlButton(variant: .close, action: onCloseTap)
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
 
                 Spacer()
 
-                VideoProgressBar(
-                    progress: $viewModel.progress,
+                // ← center controls overlay
+                VideoControlsBar(
+                    isPlaying: $viewModel.isPlaying,
                     size: .large,
-                    timeLabel: viewModel.currentTime
+                    onSkipBack: { viewModel.skipBackward() },
+                    onSkipForward: { viewModel.skipForward() },
+                    onPlayPause: { viewModel.togglePlay() }
+                )
+
+                VideoProgressBar(
+                    progress: progressBinding,
+                    size: .large,
+                    timeLabel: viewModel.currentTime,
+                    onSeek: { ratio in
+                        viewModel.seekTo(ratio) // ← seek via timeline
+                    }
                 )
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             }
+            .background(
+                // ← gelapin pinggiran biar kontrol kebaca
+                LinearGradient(
+                    colors: [.clear, Color.Neutral.black.opacity(0.6)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+            )
         }
+    }
+
+    // MARK: - Fullscreen Button (glyph sendiri, tanpa SF Symbol)
+
+    private func fullscreenButton(intoLandscape: Bool) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isLandscape = intoLandscape
+            }
+        } label: {
+            HStack(spacing: 6) {
+                fullscreenGlyph
+                    .frame(width: 18, height: 18)
+                if !intoLandscape {
+                    Text("Kecilkan")
+                        .font(.Typography.Medium.caption2)
+                        .foregroundStyle(Color.Semantic.textPrimary)
+                }
+            }
+            .padding(8)
+            .background(Color.Neutral.black.opacity(0.5))
+            .clipShape(Capsule())
+        }
+    }
+
+    /// Glyph fullscreen: dua sudut (kiri-atas + kanan-bawah).
+    private var fullscreenGlyph: some View {
+        Path { path in
+            let s: CGFloat = 8
+            // ← sudut kiri-atas
+            path.move(to: CGPoint(x: 0, y: s))
+            path.addLine(to: CGPoint(x: 0, y: 0))
+            path.addLine(to: CGPoint(x: s, y: 0))
+            // ← sudut kanan-bawah
+            path.move(to: CGPoint(x: 20 - s, y: 20))
+            path.addLine(to: CGPoint(x: 20, y: 20))
+            path.addLine(to: CGPoint(x: 20, y: 20 - s))
+        }
+        .stroke(Color.Neutral.white, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+    }
+
+    // MARK: - Progress Binding (hindari konflik time observer vs drag)
+
+    private var progressBinding: Binding<Double> {
+        Binding(
+            get: { viewModel.isScrubbing ? viewModel.scrubProgress : viewModel.progress },
+            set: { newValue in
+                viewModel.scrubProgress = newValue
+                viewModel.isScrubbing = true
+            }
+        )
     }
 
     // MARK: - Demo Video Picker
 
     private var demoVideoPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Demo Videos")
+            Text("Pilih Video")
                 .font(.Typography.Medium.caption1)
                 .foregroundStyle(Color.Semantic.textTertiary)
 
@@ -171,14 +270,27 @@ struct VideoPlayerPage: View {
                 HStack(spacing: 12) {
                     ForEach(Array(viewModel.demoVideos.enumerated()), id: \.element.id) { index, video in
                         Button {
-                            viewModel.loadDemoVideo(at: index) // ← ganti video
+                            viewModel.loadDemoVideo(at: index) // ← ganti video (auto-play)
                         } label: {
                             VStack(spacing: 4) {
-                                PosterImage(url: video.posterURL, width: 80, height: 45, cornerRadius: 4) // ← poster component
-
+                                ZStack(alignment: .bottomTrailing) {
+                                    PosterImage(url: video.posterURL, width: 80, height: 45, cornerRadius: 4) // ← poster component
+                                    if index == viewModel.selectedDemoIndex {
+                                        LinearGradient(
+                                            colors: [Color.Primary.red, Color.Primary.red.opacity(0.6)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                        .frame(width: 24, height: 3) // ← indikator video aktif
+                                    }
+                                }
                                 Text(video.title)
                                     .font(.Typography.Light.caption2)
-                                    .foregroundStyle(Color.Semantic.textSecondary)
+                                    .foregroundStyle(
+                                        index == viewModel.selectedDemoIndex
+                                            ? Color.Semantic.textPrimary // ← aktif: putih
+                                            : Color.Semantic.textSecondary
+                                    )
                                     .lineLimit(1)
                             }
                         }
@@ -188,6 +300,12 @@ struct VideoPlayerPage: View {
             }
         }
     }
+}
+
+// MARK: - Metrics
+
+private enum Metrics {
+    static let videoHeight: CGFloat = 260 // ← ubah tinggi area video portrait
 }
 
 // MARK: - Preview

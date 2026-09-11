@@ -58,3 +58,15 @@ __pycache__/
 .env
 venv/
 .venv/
+
+# Go backend
+backend/bin/
+backend/.env
+backend/*.pem
+backend/firebase-service-account.json
+backend/firebase-service-account.dev.json
+# Firebase server keys (service account JSON live download name pattern)
+backend/*adminsdk*.json
+
+# Firebase iOS config (downloadable secret, wiring happens in a later phase)
+**/GoogleService-Info.plist

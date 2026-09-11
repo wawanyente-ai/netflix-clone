@@ -11,13 +11,8 @@ enum APIConfig {
 
     // MARK: - TMDB
 
-    static let tmdbBaseURL = "https://api.themoviedb.org/3"  // ← ubah base URL API
+    static let tmdbBaseURL = "https://api.themoviedb.org/3"  // ← base URL API (tidak dipakai langsung; diproxy backend)
     static let tmdbImageBaseURL = "https://image.tmdb.org/t/p/"  // ← ubah base URL gambar
-
-    /// TMDB Bearer token. Replace with your real token.
-    /// Get one at: https://www.themoviedb.org/settings/api
-    static let accessToken =
-        "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzMjAwOWZiZmVlMWY1YWY3MGNhZDRhMDMxYmM2MDNiOSIsIm5iZiI6MTc4NzcyNjI3NC4wMzAwMDAyLCJzdWIiOiI2YThlODljMjY1NGZiYjZjZTQxMTIwYmUiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.doMBQpujh033-b-hMi0MAYukOZ_0rjRaGPipLau-ZLA"  // ← MASUKKAN TOKEN TMDB KAMU DI SINI
 
     // MARK: - Image Sizes
 
@@ -28,10 +23,6 @@ enum APIConfig {
         static let logo = "w92"  // ← ubah ukuran logo
         static let thumbnail = "w342"  // ← ubah ukuran thumbnail
     }
-
-    // MARK: - Headers
-
-    static var authorizationHeader: String { "Bearer \(accessToken)" }  // ← jangan ubah format
 
     // MARK: - API Values
 

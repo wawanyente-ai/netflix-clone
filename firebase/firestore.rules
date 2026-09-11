@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A user may only read/write their own subtree.
+    match /users/{uid} {
+      allow read, create: if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if request.auth != null && request.auth.uid == uid;
+
+      match /devices/{deviceToken} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /notifications/{notifId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /profiles/{profileId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+
+        match /mylist/{mediaId} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
+        match /progress/{mediaId} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
+        match /history/{entryId} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
+      }
+
+      match /tracker/{mediaId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Public content catalog (video streaming metadata).
+    match /content/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

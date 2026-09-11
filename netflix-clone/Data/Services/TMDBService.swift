@@ -6,20 +6,23 @@
 import Foundation
 
 /// Service layer for all TMDB API calls.
-/// Uses APIClient for networking and returns raw DTOs.
-/// Mappers convert DTOs → Domain Models at the ViewModel layer.
+/// Routes through the Go backend proxy (`/v1/content/...`) server-side, keeping
+/// the TMDB access token out of the iOS binary. Returns the same DTOs as TMDB
+/// because the backend passes through raw TMDB JSON.
 actor TMDBService {
 
     static let shared = TMDBService() // ← singleton shared instance
 
-    private let client = APIClient.shared
+    private let client = BackendClient.shared
 
     // MARK: - Trending
 
     /// Fetch trending content (movies + TV mixed).
     func fetchTrending(timeWindow: String = APIConfig.TimeWindow.week) async throws -> [MultiSearchResultDTO] {
-        let response: MultiSearchResponse = try await client.fetch(
-            .trending(mediaType: APIConfig.MediaType.all, timeWindow: timeWindow)
+        let response: MultiSearchResponse = try await client.request(
+            "GET",
+            "/v1/content/trending",
+            query: ["time_window": timeWindow]
         )
         return response.results // ← list trending items
     }
@@ -28,89 +31,90 @@ actor TMDBService {
 
     /// Fetch popular movies.
     func fetchPopularMovies() async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.popularMovies)
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/movie/list/popular")
         return response.results // ← list movie populer
     }
 
     /// Fetch top rated movies.
     func fetchTopRatedMovies() async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.topRatedMovies)
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/movie/list/top_rated")
         return response.results // ← list movie top rated
     }
 
     /// Fetch now playing movies.
     func fetchNowPlayingMovies() async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.nowPlayingMovies)
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/movie/list/now_playing")
         return response.results // ← list movie now playing
     }
 
     /// Fetch upcoming movies.
     func fetchUpcomingMovies() async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.upcomingMovies)
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/movie/list/upcoming")
         return response.results // ← list movie upcoming
     }
 
-    /// Fetch movie detail with credits, videos, recommendations.
+    /// Fetch movie detail (includes credits + videos + recommendations).
     func fetchMovieDetail(id: Int) async throws -> MovieDetailDTO {
-        try await client.fetch(.movieDetail(movieId: id)) // ← detail movie
+        try await client.request("GET", "/v1/content/movie/data/\(id)") // ← detail movie
     }
 
-    /// Fetch movie credits (cast + crew).
+    /// Fetch movie credits via detail (backend merges credits into detail response).
     func fetchMovieCredits(id: Int) async throws -> CreditsDTO {
-        try await client.fetch(.movieCredits(movieId: id)) // ← cast & crew
+        let detail: MovieDetailDTO = try await client.request("GET", "/v1/content/movie/data/\(id)")
+        return detail.credits ?? CreditsDTO(cast: nil, crew: nil) // ← cast & crew dari detail
     }
 
     /// Fetch movie videos (trailers, teasers).
     func fetchMovieVideos(id: Int) async throws -> [VideoDTO] {
-        let response: VideoListResponse = try await client.fetch(.movieVideos(movieId: id))
+        let response: VideoListResponse = try await client.request("GET", "/v1/content/movie/data/\(id)/videos")
         return response.results // ← list video
     }
 
     /// Fetch movie recommendations.
     func fetchMovieRecommendations(id: Int) async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.movieRecommendations(movieId: id))
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/movie/data/\(id)/recommendations")
         return response.results // ← rekomendasi movie
     }
 
-    /// Fetch similar movies.
+    /// Fetch similar movies (via recommendations proxy).
     func fetchMovieSimilar(id: Int) async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.movieSimilar(movieId: id))
-        return response.results // ← movie serupa
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/movie/data/\(id)/recommendations")
+        return response.results // ← movie serupa (routed ke recommendations)
     }
 
     // MARK: - TV Shows
 
     /// Fetch popular TV shows.
     func fetchPopularTV() async throws -> [TVShowDTO] {
-        let response: TVShowListResponse = try await client.fetch(.popularTV)
+        let response: TVShowListResponse = try await client.request("GET", "/v1/content/tv/list/popular")
         return response.results // ← list TV populer
     }
 
     /// Fetch top rated TV shows.
     func fetchTopRatedTV() async throws -> [TVShowDTO] {
-        let response: TVShowListResponse = try await client.fetch(.topRatedTV)
+        let response: TVShowListResponse = try await client.request("GET", "/v1/content/tv/list/top_rated")
         return response.results // ← list TV top rated
     }
 
-    /// Fetch TV show detail.
+    /// Fetch TV show detail (includes credits + videos + recommendations).
     func fetchTVDetail(id: Int) async throws -> TVShowDetailDTO {
-        try await client.fetch(.tvDetail(seriesId: id)) // ← detail TV
+        try await client.request("GET", "/v1/content/tv/data/\(id)") // ← detail TV
     }
 
     /// Fetch TV season detail with episodes.
     func fetchTVSeason(seriesId: Int, seasonNumber: Int) async throws -> SeasonDetailDTO {
-        try await client.fetch(.tvSeason(seriesId: seriesId, seasonNumber: seasonNumber)) // ← detail season
+        try await client.request("GET", "/v1/content/tv/data/\(seriesId)/season/\(seasonNumber)") // ← detail season
     }
 
     /// Fetch TV videos (trailers).
     func fetchTVVideos(id: Int) async throws -> [VideoDTO] {
-        let response: VideoListResponse = try await client.fetch(.tvVideos(seriesId: id))
+        let response: VideoListResponse = try await client.request("GET", "/v1/content/tv/data/\(id)/videos")
         return response.results // ← list video TV
     }
 
     /// Fetch TV recommendations.
     func fetchTVRecommendations(id: Int) async throws -> [TVShowDTO] {
-        let response: TVShowListResponse = try await client.fetch(.tvRecommendations(seriesId: id))
+        let response: TVShowListResponse = try await client.request("GET", "/v1/content/tv/data/\(id)/recommendations")
         return response.results // ← rekomendasi TV
     }
 
@@ -118,7 +122,11 @@ actor TMDBService {
 
     /// Multi-search (movies, TV, person).
     func searchMulti(query: String) async throws -> [MultiSearchResultDTO] {
-        let response: MultiSearchResponse = try await client.fetch(.searchMulti(query: query))
+        let response: MultiSearchResponse = try await client.request(
+            "GET",
+            "/v1/content/search",
+            query: ["query": query]
+        )
         return response.results // ← hasil pencarian
     }
 
@@ -126,7 +134,11 @@ actor TMDBService {
 
     /// Discover movies with optional genre filter.
     func discoverMovies(genreId: Int? = nil, sortBy: String = APIConfig.SortBy.popularityDesc) async throws -> [MovieDTO] {
-        let response: MovieListResponse = try await client.fetch(.discoverMovie(genreId: genreId, sortBy: sortBy))
+        var query: [String: String] = ["sort": sortBy]
+        if let genreId {
+            query["genre"] = "\(genreId)" // ← filter genre
+        }
+        let response: MovieListResponse = try await client.request("GET", "/v1/content/discover", query: query)
         return response.results // ← hasil discover
     }
 
@@ -134,13 +146,13 @@ actor TMDBService {
 
     /// Fetch movie genres.
     func fetchMovieGenres() async throws -> [GenreDTO] {
-        let response: GenreListResponse = try await client.fetch(.movieGenres)
+        let response: GenreListResponse = try await client.request("GET", "/v1/content/genres/movie")
         return response.genres // ← list genre movie
     }
 
     /// Fetch TV genres.
     func fetchTVGenres() async throws -> [GenreDTO] {
-        let response: GenreListResponse = try await client.fetch(.tvGenres)
+        let response: GenreListResponse = try await client.request("GET", "/v1/content/genres/tv")
         return response.genres // ← list genre TV
     }
 }

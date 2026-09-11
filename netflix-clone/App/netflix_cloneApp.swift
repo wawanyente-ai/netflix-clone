@@ -82,6 +82,13 @@ struct netflix_cloneApp: App {
                         episodeLabel: "Big Buck Bunny",
                         demoIndex: 0
                     )
+                case .myList:
+                    MyListPage(
+                        items: router.mylistItems,
+                        onTitleTap: { router.openMyListDetail($0) },
+                        onRemove: { item in Task { await router.removeFromMyList(item) } },
+                        onRefresh: { await router.loadNetflixSaya() }
+                    )
                 }
             }
         }
@@ -120,6 +127,13 @@ struct netflix_cloneApp: App {
                         demoIndex: 0,
                         onCloseTap: { router.popToRoot(from: .search) }
                     )
+                case .myList:
+                    MyListPage(
+                        items: router.mylistItems,
+                        onTitleTap: { router.openMyListDetail($0) },
+                        onRemove: { item in Task { await router.removeFromMyList(item) } },
+                        onRefresh: { await router.loadNetflixSaya() }
+                    )
                 }
             }
         }
@@ -129,7 +143,18 @@ struct netflix_cloneApp: App {
 
     private var downloadsTab: some View {
         NavigationStack(path: $router.downloadsPath) {
-            NetflixSayaPage()
+            NetflixSayaPage(
+                isSignedIn: router.isSignedIn,
+                onSignInTap: { router.showSignInSheet = true }, // ← buka sheet sign-in
+                profiles: router.profiles, // ← daftar profil
+                selectedProfileId: router.selectedProfileId, // ← profil aktif
+                history: router.historyEntries, // ← riwayat tontonan real
+                mylist: router.mylistItems, // ← my list real
+                onSelectProfile: { id in router.selectProfile(id) }, // ← ganti profil
+                onSignOut: { router.signOut() }, // ← keluar
+                onMyListTap: { item in router.openMyListDetail(item) }, // ← tap judul → detail
+                onSeeAllMyList: { router.navigateToMyList() } // ← buka halaman My List penuh
+            )
                 .navigationDestination(for: NavigationRoute.self) { route in
                     switch route {
                     case .titleDetail:
@@ -142,6 +167,13 @@ struct netflix_cloneApp: App {
                             seriesTitle: router.selectedMediaItem?.title ?? "Demo Video",
                             episodeLabel: "Big Buck Bunny",
                             demoIndex: 0
+                        )
+                    case .myList:
+                        MyListPage(
+                            items: router.mylistItems,
+                            onTitleTap: { router.openMyListDetail($0) },
+                            onRemove: { item in Task { await router.removeFromMyList(item) } },
+                            onRefresh: { await router.loadNetflixSaya() }
                         )
                     }
                 }

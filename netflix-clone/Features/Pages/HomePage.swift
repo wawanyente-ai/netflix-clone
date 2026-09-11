@@ -10,7 +10,9 @@ import SwiftUI
 struct HomePage: View {
 
     @State private var viewModel = HomeViewModel()
+    var continueWatching: [WatchProgressModel] = [] // ← lanjut tonton (butuh login)
     var onTitleTap: (MediaItem) -> Void = { _ in } // ← navigasi ke detail
+    var onMyListTap: () -> Void = {} // ← save/unsave (di-gate auth oleh app root)
 
     var body: some View {
         VStack(spacing: 0) { // ← topBar di LUAR ScrollView
@@ -22,6 +24,11 @@ struct HomePage: View {
                         loadingSkeleton
                     } else {
                         hero
+
+                        // ← Continue Watching rail (hanya kalau ada progress)
+                        if !continueWatching.isEmpty {
+                            continueWatchingRail
+                        }
 
                         // ← tampilkan rails berdasarkan filter top bar
                         switch viewModel.selectedContentType {
@@ -173,7 +180,7 @@ struct HomePage: View {
                     .lineLimit(3) // ← limit 3 baris
 
                 HStack(spacing: 8) {
-                    AppButton("My List", icon: Image.Icon.add, variant: .secondary, size: .small) {}
+                    AppButton("My List", icon: Image.Icon.add, variant: .secondary, size: .small) { onMyListTap() }
                     AppButton("Play", icon: Image.Icon.play, variant: .primary, size: .small) {
                         if let item = viewModel.heroItem { onTitleTap(item) } // ← navigasi ke detail
                     }
@@ -202,6 +209,59 @@ struct HomePage: View {
 
     private var popularTVRail: some View {
         mediaRail(title: "Popular TV Shows", items: viewModel.popularTV) // ← popular TV rail
+    }
+
+    // MARK: - Continue Watching Rail
+
+    private var continueWatchingRail: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Lanjutkan Tonton")
+                .font(.Typography.Bold.label1) // ← ubah font judul rail
+                .foregroundStyle(Color.Semantic.textPrimary)
+                .padding(.horizontal, 16) // ← ubah inset horizontal
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) { // ← ubah gap antar card
+                    ForEach(continueWatching) { progress in
+                        continueWatchingCard(progress)
+                    }
+                }
+                .padding(.horizontal, 16) // ← ubah inset horizontal
+            }
+        }
+    }
+
+    private func continueWatchingCard(_ progress: WatchProgressModel) -> some View {
+        Button {
+            if let item = mediaItem(for: progress) { onTitleTap(item) } // ← navigasi ke detail
+        } label: {
+            TitleCard(
+                kind: .continueWatching(
+                    progress: min(max(progress.completion, 0), 1), // ← progress bar 0...1
+                    episodeLabel: "\(Int(min(max(progress.completion, 0), 1) * 100))%" // ← persen progress
+                ),
+                hasImage: !progress.posterPath.isEmpty // ← tampil logo kalau ada poster
+            ) {
+                PosterImage(url: ImageURLBuilder.posterURL(from: progress.posterPath))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Convert WatchProgressModel → MediaItem (untuk navigasi detail).
+    private func mediaItem(for progress: WatchProgressModel) -> MediaItem? {
+        MediaItem(
+            id: progress.mediaId,
+            title: progress.title,
+            overview: "",
+            posterPath: progress.posterPath.isEmpty ? nil : progress.posterPath,
+            backdropPath: nil,
+            voteAverage: 0,
+            releaseDate: "",
+            mediaType: progress.mediaType == "tv" ? .tv : .movie,
+            genreIds: [],
+            runtime: nil
+        )
     }
 
     /// Reusable media rail component.

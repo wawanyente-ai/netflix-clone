@@ -9,5 +9,25 @@
 		<string>NetflixSans-Bold.otf</string>
 		<string>NetflixSans-Regular.otf</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>BackendBaseURL</key>
+	<string>http://localhost:8080</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.805224380062-r83sjvhke1868fnqa57s64882f9rl6mp</string>
+			</array>
+		</dict>
+	</array>
+	<key>GIDClientID</key>
+	<string>805224380062-r83sjvhke1868fnqa57s64882f9rl6mp.apps.googleusercontent.com</string>
 </dict>
 </plist>

@@ -33,6 +33,9 @@ struct SearchPage: View {
                     } else if viewModel.isActive {
                         searchResults
                     } else {
+                        if !viewModel.recentSearches.isEmpty {
+                            recentSearchesSection
+                        }
                         trendingSuggestions
                     }
                 }
@@ -99,6 +102,68 @@ struct SearchPage: View {
             }
         }
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - Recent Searches (maks 5)
+
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Recent Searches")
+                .font(.Typography.Bold.label1)
+                .foregroundStyle(Color.Semantic.textPrimary)
+                .padding(.horizontal, 16)
+
+            ForEach(viewModel.recentSearches, id: \.self) { item in
+                HStack(spacing: 12) {
+                    // ← ikon riwayat (custom, tanpa SF Symbol)
+                    Path { path in
+                        path.move(to: CGPoint(x: 2, y: 10))
+                        path.addArc(
+                            center: CGPoint(x: 10, y: 10),
+                            radius: 8,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270),
+                            clockwise: false
+                        )
+                    }
+                    .stroke(Color.Semantic.textTertiary, lineWidth: 1.5)
+                    .frame(width: 20, height: 20)
+                    .overlay(
+                        Path { path in
+                            path.move(to: CGPoint(x: 7, y: 10))
+                            path.addLine(to: CGPoint(x: 10, y: 10))
+                            path.addLine(to: CGPoint(x: 10, y: 13))
+                        }
+                        .stroke(Color.Semantic.textTertiary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                        .frame(width: 20, height: 20)
+                    )
+
+                    Button {
+                        viewModel.applyRecent(item) // ← set query → auto search
+                    } label: {
+                        Text(item)
+                            .font(.Typography.Medium.label3)
+                            .foregroundStyle(Color.Semantic.textPrimary)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Button {
+                        viewModel.removeRecent(item) // ← hapus dari riwayat
+                    } label: {
+                        Image.Icon.close
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                            .foregroundStyle(Color.Semantic.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.top, 8)
     }
 
     // MARK: - Trending Suggestions (no input) — pakai TopSearchRow

@@ -63,43 +63,8 @@ DesignSystem/
             ├── VideoProgressBar.swift
             └── VideoThumbnail.swift
 ```
-    │   │   ├── ClearButton.swift
-    │   │   └── TemplateIcon.swift
-    │   └── Molecules/
-    │       ├── InputField.swift
-    │       └── SearchBar.swift
-    ├── NavigationAndMenus/
-    │   ├── Atoms/
-    │   │   └── NavigationIcon.swift
-    │   └── Molecules/
-    │       └── NavigationBar.swift
-    ├── TitleCards/
-    │   ├── Molecules/
-    │   │   └── TitleCard.swift
-    │   └── Organisms/
-    │       ├── ContentRow.swift
-    │       └── TopSearchRow.swift
-    └── VideoPlayer/
-        ├── Atoms/
-        │   ├── QualityBadge.swift
-        │   └── RatingBadge.swift
-        ├── Molecules/
-        │   ├── BrightnessControl.swift
-        │   ├── EpisodeSummaryRow.swift
-        │   ├── SeasonSelectionDropdown.swift
-        │   ├── TitleDetailsTabBar.swift
-        │   ├── VideoAdvancedControlsBar.swift
-        │   ├── VideoControlsBar.swift
-        │   ├── VideoMetadataBar.swift
-        │   ├── VideoPlayerTopBar.swift
-        │   ├── VideoProgressBar.swift
-        │   └── VideoThumbnail.swift
-        └── Templates/
-            ├── VideoPlayerLandscapeScreen.swift
-            └── VideoPlayerPortraitScreen.swift
-```
 
-Convention: new components go to `Components/<Group>/<Tier>/Molecules/<Name>.swift`. Templates are full-screen compositions, not reusable primitives.
+Convention: new components go to `Components/<Group>/<Tier>/Molecules/<Name>.swift`. No full-screen template compositions live under DesignSystem (screens live in `Features/Pages/`).
 
 ---
 
@@ -400,7 +365,7 @@ Metrics: 75×36, icon 24, spacing 2, font Light.caption2 (10pt — closest catal
 
 #### Molecule: NavigationBar
 
-Bottom tab bar. 5 tabs: Home, New & Hot, Fast Laughs, Search, Downloads.
+Bottom tab bar. 4 tabs: Home, Klip, Cari, Netflix Saya.
 
 ```swift
 @State private var tab: NavigationBar.Tab = .home
@@ -523,14 +488,6 @@ Metrics: vSpacing 8, hSpacing 8, thumbnail 124×69. Uses `VideoThumbnail(.second
 **SeasonSelectionDropdown** — "Season N" picker via native `Menu`. Chevron drawn as custom `Shape` (no catalog asset yet). Text: Light.caption1 `greyLight3`, spacing 6, chevron 16.
 
 **TitleDetailsTabBar** — Episodes / Collection / More Like This / Trailers & More. Composed from `VideoTabButton`. Spacing 16.
-
-#### Templates
-
-Full-screen screen compositions (not reusable primitives). Layout approximates Figma positioning.
-
-**VideoPlayerLandscapeScreen** — landscape player: top bar, brightness control (large), transport bar (large), progress bar (large), advanced controls.
-
-**VideoPlayerPortraitScreen** — portrait player + metadata + tabs + season picker + episode list. Uses all smaller sizes. Includes `Episode` model struct for episode list data.
 
 ---
 

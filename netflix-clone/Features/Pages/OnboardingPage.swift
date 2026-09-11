@@ -10,7 +10,9 @@ import SwiftUI
 struct OnboardingPage: View {
 
     @State private var viewModel = OnboardingViewModel()
-    var onComplete: () -> Void = {} // ← panggil setelah sign-in/get-started
+    @State private var signInError: String? // ← error Google sign-in
+    var onComplete: () -> Void = {} // ← panggil setelah get-started (guest)
+    var onGoogleSignIn: () async -> Bool = { true } // ← real Google Sign-In flow
 
     var body: some View {
         VStack(spacing: 0) {
@@ -202,6 +204,14 @@ struct OnboardingPage: View {
                     .font(.Typography.Bold.label1)
                     .foregroundStyle(Color.Semantic.textPrimary)
 
+                if let signInError {
+                    Text(signInError)
+                        .font(.Typography.Medium.caption2)
+                        .foregroundStyle(Color.Primary.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+
                 VStack(spacing: 12) { // ← ubah gap antar tombol sign-in
                     googleSignInButton
                     appleSignInButton
@@ -222,8 +232,14 @@ struct OnboardingPage: View {
 
     private var googleSignInButton: some View {
         Button {
-            viewModel.showSignInSheet = false // ← ubah aksi Google sign-in
-            onComplete()
+            Task {
+                viewModel.showSignInSheet = false // ← tutup sheet
+                let success = await onGoogleSignIn() // ← real Google sign-in (Firebase)
+                if !success {
+                    signInError = "Gagal masuk. Coba lagi." // ← kasih tahu user
+                    viewModel.showSignInSheet = true // ← buka lagi buat retry
+                }
+            }
         } label: {
             HStack(spacing: 12) { // ← ubah gap icon-to-text
                 TemplateIcon(image: Image.Icon.info, size: 20, tint: Color.Semantic.textPrimary) // ← stand-in Google icon
