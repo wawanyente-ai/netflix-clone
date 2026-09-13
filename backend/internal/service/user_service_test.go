@@ -49,7 +49,7 @@ func TestGetOrCreateUser_CreatesOnFirstSignIn(t *testing.T) {
 		"firebase.sign_in_provider": "google.com",
 	})
 
-	u, err := svc.GetOrCreateUser(context.Background(), tok)
+	u, err := svc.GetOrCreateUser(context.Background(), tok, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,11 +75,11 @@ func TestGetOrCreateUser_Idempotent(t *testing.T) {
 	uid := uuid.NewString()
 	tok := testToken(uid, map[string]any{"email": "a@example.com"})
 
-	first, err := svc.GetOrCreateUser(context.Background(), tok)
+	first, err := svc.GetOrCreateUser(context.Background(), tok, "")
 	if err != nil {
 		t.Fatalf("first sign-in failed: %v", err)
 	}
-	second, err := svc.GetOrCreateUser(context.Background(), tok)
+	second, err := svc.GetOrCreateUser(context.Background(), tok, "")
 	if err != nil {
 		t.Fatalf("second sign-in failed: %v", err)
 	}
@@ -88,15 +88,57 @@ func TestGetOrCreateUser_Idempotent(t *testing.T) {
 	}
 }
 
-func TestGetOrCreateUser_FallsBackToEmailPrefix(t *testing.T) {
+func TestGetOrCreateUser_FallsBackToEmail(t *testing.T) {
 	svc, _ := testSvc()
 	tok := testToken(uuid.NewString(), map[string]any{"email": "dewi@example.com"})
 
-	u, err := svc.GetOrCreateUser(context.Background(), tok)
+	u, err := svc.GetOrCreateUser(context.Background(), tok, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if u.DisplayName != "dewi" {
-		t.Fatalf("want displayName dewi, got %s", u.DisplayName)
+	if u.DisplayName != "Dewi" {
+		t.Fatalf("want displayName Dewi, got %s", u.DisplayName)
+	}
+}
+
+func TestGetOrCreateUser_EmailNameFromFirstAndLastName(t *testing.T) {
+	svc, _ := testSvc()
+	tok := testToken(uuid.NewString(), map[string]any{"email": "dewi.maya@example.com"})
+
+	u, err := svc.GetOrCreateUser(context.Background(), tok, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if u.DisplayName != "Dewi Maya" {
+		t.Fatalf("want displayName Dewi Maya, got %s", u.DisplayName)
+	}
+}
+
+func TestGetOrCreateUser_UsesPreferredNameWhenTokenHasNoName(t *testing.T) {
+	svc, _ := testSvc()
+	tok := testToken(uuid.NewString(), map[string]any{"email": "dewi@example.com"})
+
+	u, err := svc.GetOrCreateUser(context.Background(), tok, "  Dewi Lestari  ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if u.DisplayName != "Dewi Lestari" {
+		t.Fatalf("want displayName Dewi Lestari, got %q", u.DisplayName)
+	}
+}
+
+func TestGetOrCreateUser_TokenNameWinsOverPreferred(t *testing.T) {
+	svc, _ := testSvc()
+	tok := testToken(uuid.NewString(), map[string]any{
+		"email": "budi@example.com",
+		"name":  "Budi Santoso",
+	})
+
+	u, err := svc.GetOrCreateUser(context.Background(), tok, "Nama Salah")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if u.DisplayName != "Budi Santoso" {
+		t.Fatalf("want displayName Budi Santoso (token name wins), got %q", u.DisplayName)
 	}
 }

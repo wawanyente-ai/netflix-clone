@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
+	"unicode"
 
 	"firebase.google.com/go/v4/auth"
 
@@ -34,7 +36,10 @@ func NewUserService(store UserStore, logger *slog.Logger) *UserService {
 
 // GetOrCreateUser returns the existing user or creates one from token claims.
 // Idempotent: repeated sign-ins never duplicate documents.
-func (s *UserService) GetOrCreateUser(ctx context.Context, tok *auth.Token) (*models.User, error) {
+// preferredName is an optional client-supplied name (e.g. Sign in with Apple,
+// which does not always expose the profile name in the token). It is only used
+// as a fallback when the token carries no `name` claim.
+func (s *UserService) GetOrCreateUser(ctx context.Context, tok *auth.Token, preferredName string) (*models.User, error) {
 	uid := tok.UID
 
 	existing, err := s.store.GetUser(ctx, uid)
@@ -53,7 +58,10 @@ func (s *UserService) GetOrCreateUser(ctx context.Context, tok *auth.Token) (*mo
 		CreatedAt:   time.Now().UTC(),
 	}
 	if u.DisplayName == "" {
-		u.DisplayName = emailPrefix(u.Email)
+		u.DisplayName = strings.TrimSpace(preferredName)
+	}
+	if u.DisplayName == "" {
+		u.DisplayName = displayNameFromEmail(u.Email)
 	}
 
 	if err := s.store.CreateUser(ctx, u); err != nil {
@@ -74,11 +82,39 @@ func stringClaim(tok *auth.Token, key string) string {
 	return ""
 }
 
-func emailPrefix(email string) string {
-	for i, r := range email {
-		if r == '@' {
-			return email[:i]
-		}
+// displayNameFromEmail derives a human-readable name from an email address.
+// "dewi.maya@example.com" → "Dewi Maya"; "dewi85@example.com" → "Dewi85".
+func displayNameFromEmail(email string) string {
+	prefix := email
+	if i := strings.IndexByte(email, '@'); i >= 0 {
+		prefix = email[:i]
 	}
-	return email
+	parts := strings.FieldsFunc(prefix, func(r rune) bool {
+		return r == '.' || r == '_' || r == '-'
+	})
+	names := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p == "" {
+			continue
+		}
+		names = append(names, capitalizeWord(p))
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return strings.Join(names, " ")
+}
+
+// capitalizeWord uppercases the first letter and lowercases the rest:
+// "dewi" → "Dewi", "MAYA" → "Maya".
+func capitalizeWord(w string) string {
+	r := []rune(w)
+	if len(r) == 0 {
+		return ""
+	}
+	r[0] = unicode.ToUpper(r[0])
+	for i := 1; i < len(r); i++ {
+		r[i] = unicode.ToLower(r[i])
+	}
+	return string(r)
 }

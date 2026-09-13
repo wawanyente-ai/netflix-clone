@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -28,6 +29,14 @@ type SignInResponse struct {
 	Profiles []*models.Profile `json:"profiles"`
 }
 
+// signInRequest is an optional body. The token itself arrives via the
+// `Authorization` header; `idToken` in the body is accepted for compatibility
+// with the documented payload but not required.
+type signInRequest struct {
+	IDToken     string `json:"idToken"`
+	DisplayName string `json:"displayName"`
+}
+
 // SignIn verifies the Firebase ID token (done by the auth middleware), creates
 // the user on first sign-in, and returns the user plus profiles. No second
 // token round-trip: claims are read from the request context.
@@ -38,8 +47,16 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var req signInRequest
+	if r.Body != nil && r.ContentLength > 0 {
+		if err := decodeJSON(r, &req); err != nil && err != io.EOF {
+			writeError(w, http.StatusBadRequest, "invalid request body", h.logger, err)
+			return
+		}
+	}
+
 	uid := middleware.UID(r.Context())
-	user, err := h.userSvc.GetOrCreateUser(r.Context(), tok)
+	user, err := h.userSvc.GetOrCreateUser(r.Context(), tok, req.DisplayName)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create user", h.logger, err)
 		return
