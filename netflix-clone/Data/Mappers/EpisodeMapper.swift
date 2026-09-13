@@ -5,16 +5,6 @@
 
 import Foundation
 
-// MARK: - Dummy DTO
-
-/// Data Transfer Object — matches `episodes.json` structure (dummy fallback).
-struct EpisodeDTO: Codable {
-    let id: String
-    let title: String
-    let duration: String
-    let synopsis: String
-}
-
 // MARK: - TMDB DTO
 
 /// TMDB Episode DTO — matches TMDB season detail response.
@@ -40,31 +30,6 @@ struct TMDBEpisodeDTO: Codable {
 // MARK: - Mapper
 
 enum EpisodeMapper {
-
-    // MARK: - Dummy
-
-    /// Map dummy DTO → Domain Model.
-    static func map(from dto: EpisodeDTO) -> Episode {
-        Episode(
-            id: dto.id,
-            tmdbId: nil,
-            title: dto.title,
-            duration: dto.duration,
-            synopsis: dto.synopsis,
-            stillPath: nil,
-            airDate: nil,
-            episodeNumber: nil,
-            seasonNumber: nil
-        )
-    }
-
-    static func map(from dtos: [EpisodeDTO]) -> [Episode] {
-        dtos.map(map(from:)) // ← map array
-    }
-
-    static func loadDummy() -> [Episode] {
-        loadJSON(filename: "episodes") // ← load dari dummy JSON
-    }
 
     // MARK: - TMDB
 
@@ -92,15 +57,5 @@ enum EpisodeMapper {
 
     static func fromTMDB(_ dtos: [TMDBEpisodeDTO]) -> [Episode] {
         dtos.map(fromTMDB) // ← map array
-    }
-
-    // MARK: - Private
-
-    private static func loadJSON(filename: String) -> [Episode] {
-        guard let url = Bundle.main.url(forResource: filename, withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let dtos = try? JSONDecoder().decode([EpisodeDTO].self, from: data)
-        else { return [] }
-        return map(from: dtos)
     }
 }

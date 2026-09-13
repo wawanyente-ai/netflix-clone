@@ -142,7 +142,7 @@ Image.Brand.logoSmall          // Brand/NetflixLogoSmall
 Image.Brand.wordmark           // Brand/NetflixWordmark
 
 Image.Icon.add                 // Icons/Add
-Image.Icon.brightness, .close, .downloadAction, .downloadNavigation,
+Image.Icon.brightness, .check, .close, .downloadAction, .downloadNavigation,
       .error, .home, .info, .like, .lockClosed, .lockOpen, .mirror,
       .pause, .play, .playStacked, .search, .share, .skipBackward,
       .skipForward, .smile, .speed, .subtitles, .user

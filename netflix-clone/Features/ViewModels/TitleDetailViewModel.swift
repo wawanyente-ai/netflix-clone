@@ -75,9 +75,7 @@ final class TitleDetailViewModel {
                 }
             }
         } catch {
-            errorMessage = error.localizedDescription
-            // ← fallback ke dummy data
-            titleDetail = TitleDetailMapper.loadDummy()
+            errorMessage = error.localizedDescription // ← tampilkan error, tanpa dummy fallback
         }
 
         isLoading = false

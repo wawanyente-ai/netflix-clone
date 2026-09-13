@@ -15,7 +15,7 @@ struct PosterImage: View {
     var cornerRadius: CGFloat = 4 // ← ubah corner radius
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        CachedAsyncImage(url: url) { phase in // ← pakai cache (memory + disk), shimmer cuma sekali
             switch phase {
             case .success(let image):
                 image
@@ -69,7 +69,7 @@ struct BackdropImage: View {
 
     var body: some View {
         GeometryReader { geo in
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in // ← pakai cache (memory + disk), shimmer cuma sekali
                 switch phase {
                 case .success(let image):
                     image
@@ -121,7 +121,7 @@ struct ProfileImage: View {
     var size: CGFloat = 60 // ← ubah ukuran
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        CachedAsyncImage(url: url) { phase in // ← pakai cache (memory + disk), shimmer cuma sekali
             switch phase {
             case .success(let image):
                 image

@@ -6,7 +6,8 @@
 import Foundation
 
 /// User backend (`POST /v1/auth/signin` response). Mirrors Go `models.User`.
-struct BackendUser: Decodable {
+/// Codable supaya bisa di-cache lokal (UserDefaults) buat restore cepat + offline.
+struct BackendUser: Codable {
     let uid: String
     let email: String
     let displayName: String
@@ -15,7 +16,8 @@ struct BackendUser: Decodable {
 }
 
 /// Netflix-style profile. Mirrors Go `models.Profile`.
-struct UserProfile: Identifiable, Decodable {
+/// Codable supaya bisa di-cache lokal (UserDefaults) buat restore cepat + offline.
+struct UserProfile: Identifiable, Codable {
     let profileId: String
     let name: String
     let avatarColor: String

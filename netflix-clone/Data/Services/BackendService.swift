@@ -20,8 +20,16 @@ enum BackendService {
         let profiles: [UserProfile]
     }
 
-    static func signIn() async throws -> SignInResponse {
-        try await client.request("POST", "/v1/auth/signin")
+    /// `displayName` opsional: fallback nama user kalau token Firebase tidak
+    /// punya klaim `name` (endpoint `/v1/auth/signin`).
+    static func signIn(displayName: String? = nil) async throws -> SignInResponse {
+        struct Body: Encodable {
+            let displayName: String
+        }
+        if let name = displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return try await client.request("POST", "/v1/auth/signin", body: Body(displayName: name))
+        }
+        return try await client.request("POST", "/v1/auth/signin")
     }
 
     // MARK: - Profiles

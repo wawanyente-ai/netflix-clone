@@ -54,21 +54,37 @@ struct NavigationBar: View {
         .padding(.horizontal, Metrics.horizontalPadding) // ← ubah inset horizontal
         .padding(.vertical, Metrics.verticalPadding) // ← ubah inset vertical
         .background(
-            // ← glassmorphism effect (lebih gelap)
+            // ← efek glassmorphism: blur material + tint + border mengkilat
             Capsule()
-                .fill(.ultraThinMaterial) // ← material transparan
+                .fill(.ultraThinMaterial) // ← blur transparan (konten tab kelihatan di belakang)
                 .overlay(
                     Capsule()
-                        .fill(Color.Neutral.black.opacity(0.6)) // ← overlay gelap tambahan
+                        .fill(Color.Neutral.black.opacity(0.25)) // ← tint gelap tipis (bukan nutup blur)
                 )
                 .overlay(
                     Capsule()
                         .stroke(
-                            Color.Neutral.white.opacity(0.1), // ← ubah warna border glass
-                            lineWidth: 0.5 // ← ubah ketebalan border glass
+                            LinearGradient(
+                                colors: [                                    // ← border highlight kaca
+                                    Color.Neutral.white.opacity(0.5),
+                                    Color.Neutral.white.opacity(0.15),
+                                    Color.Neutral.white.opacity(0.05)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1 // ← ubah ketebalan border glass
                         )
                 )
+                .overlay(
+                    // ← highlight atas tipis biar kesan "kaca"
+                    Capsule()
+                        .stroke(Color.Neutral.white.opacity(0.15), lineWidth: 0.5)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                )
         )
+        .shadow(color: Color.Neutral.black.opacity(0.5), radius: 12, y: 4) // ← bayangan biar mengambang
         .padding(.horizontal, Metrics.containerHorizontalPadding) // ← ubah inset container
         .padding(.bottom, Metrics.containerBottomPadding) // ← ubah inset bawah (floating)
     }
@@ -112,6 +128,9 @@ struct NavigationBar: View {
 
             Text(tab.title)
                 .font(.Typography.Light.caption2) // ← ubah font label (selalu tampil)
+                .lineLimit(1) // ← jangan pecah jadi 2 baris
+                .minimumScaleFactor(0.7) // ← autoshrink kalau kepanjangan
+                .fixedSize(horizontal: false, vertical: true) // ← cegah wrap
                 .foregroundStyle(
                     isActive
                         ? Color.Neutral.white // ← ubah warna label aktif (putih)

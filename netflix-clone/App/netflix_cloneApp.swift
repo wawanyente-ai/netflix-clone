@@ -7,6 +7,7 @@ import SwiftUI
 
 @main
 struct netflix_cloneApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var router = AppRouter()
 
     var body: some Scene {
@@ -19,13 +20,19 @@ struct netflix_cloneApp: App {
 
     @ViewBuilder
     private var rootContent: some View {
-        if router.onboardingComplete {
-            mainTabView
-        } else {
-            OnboardingPage {
-                router.completeOnboarding()
+        Group {
+            if router.onboardingComplete {
+                mainTabView
+            } else {
+                OnboardingPage(
+                    onComplete: { router.completeOnboarding() }, // ← lanjut guest tanpa login
+                    onGoogleSignIn: {
+                        await router.completeSignIn() // ← real Google sign-in
+                    }
+                )
             }
         }
+        .task { router.restoreSessionIfNeeded() } // ← restore login + muat data backend pas app dibuka
     }
 
     // MARK: - Main Tab View
@@ -35,9 +42,15 @@ struct netflix_cloneApp: App {
             tabContent
                 .toolbar(.hidden, for: .tabBar)
 
-            NavigationBar(selection: $router.selectedTab) // ← floating pill bar
+            NavigationBar(selection: Binding( // ← custom binding: tiap tab disentuh, tab tujuan balik ke root
+                get: { router.selectedTab },
+                set: { newTab in router.selectTab(newTab) }
+            )) // ← floating pill bar
         }
         .background(Color.Semantic.background.ignoresSafeArea())
+        .sheet(isPresented: $router.showSignInSheet) { // ← modal sign-in (fitur ber-lock)
+            AuthSheetView(onGoogleSignIn: { await router.completeSignIn() })
+        }
     }
 
     // MARK: - Tab Content
@@ -60,16 +73,47 @@ struct netflix_cloneApp: App {
 
     private var homeTab: some View {
         NavigationStack(path: $router.homePath) {
-            HomePage(onTitleTap: { item in
-                router.selectedMediaItem = item
-                router.navigateToTitleDetail(from: .home)
-            })
+            HomePage(
+                viewModel: router.homeViewModel,
+                continueWatching: router.continueWatching, // ← rail Lanjutkan Tonton real
+                onTitleTap: { item in
+                    router.selectedMediaItem = item
+                    router.navigateToTitleDetail(from: .home)
+                },
+                onMyListTap: { item in
+                    router.requireAuth {
+                        router.selectedMediaItem = item
+                        Task { await router.toggleHeroMyList() } // ← save/unsave
+                    }
+                },
+                isInMyList: { item in
+                    router.isInMyList(mediaType: item.mediaType.rawValue, mediaId: item.id)
+                },
+                isSavingMyList: { item in
+                    router.isSavingMyList(mediaType: item.mediaType.rawValue, mediaId: item.id)
+                }
+            )
             .navigationDestination(for: NavigationRoute.self) { route in
                 switch route {
                 case .titleDetail:
                     TitleDetailPage(
                         mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
                         mediaId: router.selectedMediaItem?.id ?? 0,
+                        isInMyList: {
+                            router.isInMyList(
+                                mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                mediaId: router.selectedMediaItem?.id ?? 0
+                            )
+                        },
+                        isSavingMyList: {
+                            router.isSavingMyList(
+                                mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                mediaId: router.selectedMediaItem?.id ?? 0
+                            )
+                        },
+                        onMyListTap: {
+                            router.requireAuth { Task { await router.toggleHeroMyList() } }
+                        },
                         onPlayTap: { router.navigateToVideoPlayer(from: .home) },
                         onTitleTap: { item in
                             router.selectedMediaItem = item
@@ -80,7 +124,11 @@ struct netflix_cloneApp: App {
                     VideoPlayerPage(
                         seriesTitle: router.selectedMediaItem?.title ?? "Demo Video",
                         episodeLabel: "Big Buck Bunny",
-                        demoIndex: 0
+                        demoIndex: 0,
+                        onStartPlaying: { Task { await router.logWatchHistory() } }, // ← riwayat
+                        onProgressSave: { position, duration in
+                            Task { await router.saveProgress(position: position, duration: duration) } // ← continue watching
+                        }
                     )
                 case .myList:
                     MyListPage(
@@ -97,7 +145,72 @@ struct netflix_cloneApp: App {
     // MARK: - Klip Tab
 
     private var klipTab: some View {
-        KlipPage()
+        NavigationStack(path: $router.klipPath) {
+            KlipPage(
+                onPlayTap: { klip in
+                    router.selectedMediaItem = klip.mediaItem
+                    router.navigateToVideoPlayer(from: .klip) // ← play
+                },
+                onInfoTap: { klip in
+                    router.selectedMediaItem = klip.mediaItem
+                    router.navigateToTitleDetail(from: .klip) // ← info ke detail
+                },
+                onMyListTap: { klip in
+                    router.requireAuth {
+                        router.selectedMediaItem = klip.mediaItem
+                        Task { await router.toggleHeroMyList() } // ← save/unsave
+                    }
+                },
+                isInMyList: { klip in
+                    router.isInMyList(mediaType: klip.mediaType, mediaId: klip.mediaId)
+                },
+                isSavingMyList: { klip in
+                    router.isSavingMyList(mediaType: klip.mediaType, mediaId: klip.mediaId)
+                }
+            )
+            .navigationDestination(for: NavigationRoute.self) { route in
+                switch route {
+                case .titleDetail:
+                    TitleDetailPage(
+                        mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                        mediaId: router.selectedMediaItem?.id ?? 0,
+                        isInMyList: {
+                            router.isInMyList(
+                                mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                mediaId: router.selectedMediaItem?.id ?? 0
+                            )
+                        },
+                        isSavingMyList: {
+                            router.isSavingMyList(
+                                mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                mediaId: router.selectedMediaItem?.id ?? 0
+                            )
+                        },
+                        onMyListTap: {
+                            router.requireAuth { Task { await router.toggleHeroMyList() } }
+                        },
+                        onPlayTap: { router.navigateToVideoPlayer(from: .klip) }
+                    )
+                case .videoPlayer:
+                    VideoPlayerPage(
+                        seriesTitle: router.selectedMediaItem?.title ?? "Demo Video",
+                        episodeLabel: "Big Buck Bunny",
+                        demoIndex: 0,
+                        onStartPlaying: { Task { await router.logWatchHistory() } },
+                        onProgressSave: { position, duration in
+                            Task { await router.saveProgress(position: position, duration: duration) }
+                        }
+                    )
+                case .myList:
+                    MyListPage(
+                        items: router.mylistItems,
+                        onTitleTap: { router.openMyListDetail($0) },
+                        onRemove: { item in Task { await router.removeFromMyList(item) } },
+                        onRefresh: { await router.loadNetflixSaya() }
+                    )
+                }
+            }
+        }
     }
 
     // MARK: - Search Tab
@@ -114,6 +227,21 @@ struct netflix_cloneApp: App {
                     TitleDetailPage(
                         mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
                         mediaId: router.selectedMediaItem?.id ?? 0,
+                        isInMyList: {
+                            router.isInMyList(
+                                mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                mediaId: router.selectedMediaItem?.id ?? 0
+                            )
+                        },
+                        isSavingMyList: {
+                            router.isSavingMyList(
+                                mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                mediaId: router.selectedMediaItem?.id ?? 0
+                            )
+                        },
+                        onMyListTap: {
+                            router.requireAuth { Task { await router.toggleHeroMyList() } }
+                        },
                         onPlayTap: { router.navigateToVideoPlayer(from: .search) },
                         onTitleTap: { item in
                             router.selectedMediaItem = item
@@ -125,7 +253,11 @@ struct netflix_cloneApp: App {
                         seriesTitle: router.selectedMediaItem?.title ?? "Demo Video",
                         episodeLabel: "Big Buck Bunny",
                         demoIndex: 0,
-                        onCloseTap: { router.popToRoot(from: .search) }
+                        onCloseTap: { router.popToRoot(from: .search) },
+                        onStartPlaying: { Task { await router.logWatchHistory() } },
+                        onProgressSave: { position, duration in
+                            Task { await router.saveProgress(position: position, duration: duration) }
+                        }
                     )
                 case .myList:
                     MyListPage(
@@ -160,13 +292,32 @@ struct netflix_cloneApp: App {
                     case .titleDetail:
                         TitleDetailPage(
                             mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
-                            mediaId: router.selectedMediaItem?.id ?? 0
+                            mediaId: router.selectedMediaItem?.id ?? 0,
+                            isInMyList: {
+                                router.isInMyList(
+                                    mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                    mediaId: router.selectedMediaItem?.id ?? 0
+                                )
+                            },
+                            isSavingMyList: {
+                                router.isSavingMyList(
+                                    mediaType: router.selectedMediaItem?.mediaType.rawValue ?? "movie",
+                                    mediaId: router.selectedMediaItem?.id ?? 0
+                                )
+                            },
+                            onMyListTap: {
+                                router.requireAuth { Task { await router.toggleHeroMyList() } }
+                            }
                         )
                     case .videoPlayer:
                         VideoPlayerPage(
                             seriesTitle: router.selectedMediaItem?.title ?? "Demo Video",
                             episodeLabel: "Big Buck Bunny",
-                            demoIndex: 0
+                            demoIndex: 0,
+                            onStartPlaying: { Task { await router.logWatchHistory() } },
+                            onProgressSave: { position, duration in
+                                Task { await router.saveProgress(position: position, duration: duration) }
+                            }
                         )
                     case .myList:
                         MyListPage(

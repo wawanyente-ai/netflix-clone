@@ -41,9 +41,12 @@ Backend server (Go, `backend/`) butuh ID token Firebase untuk semua route `/v1/*
 - `ALLOW_UNAUTHENTICATED_DEV=true` di `backend/.env` → semua request dianggap user `dev-user` (synthetic token `dev@local`). **Wajib false di production.**
 - Token TMDB **hanya di server** (`backend/internal/tmdb`), iOS tidak pegang token.
 
-## Tantangan Ke Depan (Fase 8)
+## Status Auth (selesai)
 
-- Real sign-in: Firebase iOS SDK (Google Sign-In, Sign in with Apple), bundle id `ozi.netflix-clone`.
-- `completeSignIn` → kirim ID token ke `POST /v1/auth/signin` → simpan user + profiles.
-- `isSignedIn` = ada token valid (bukan sekadar flag UserDefaults).
-- My List/Download/ContinueWatching → backend `/v1/profiles/{id}/...`.
+- **Real sign-in (Google)**: Firebase iOS SDK (GoogleSignIn, `AuthService`) + `POST /v1/auth/signin` → backend verifikasi token → get-or-create user di Firestore (`users/{uid}`: `email`, `displayName`, `provider`, `createdAt`). Info user **tersimpan**, bukan sekadar flag.
+- `completeSignIn` → `AuthService.signInWithGoogle()` → Firebase ID token → `BackendConfig.idToken` → `POST /v1/auth/signin` → simpan user + profiles.
+- `isSignedIn` = ada session valid: app cadangkan user+profiles ke `UserDefaults` (`cachedBackendUser`, `cachedProfiles`) lalu validasi ulang token ke backend saat launch. Token invalid/expired (401) → logout bersih. Backend offline → session cache tetap login.
+- Profil default user baru = `displayName` user (bukan hardcoded).
+- Signed-in state tidak semata flag: `restoreSessionIfNeeded` me-refresh session + fallback cache.
+
+## Tantangan Ke Depan (Fase 8)

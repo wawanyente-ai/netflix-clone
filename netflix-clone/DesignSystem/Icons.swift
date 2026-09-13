@@ -23,6 +23,7 @@ extension Image {
     enum Icon {
         static let add = Image("Add")
         static let brightness = Image("Brightness")
+        static let check = Image("Check")
         static let close = Image("Close")
         static let downloadAction = Image("DownloadAction")
         static let downloadNavigation = Image("DownloadNavigation")

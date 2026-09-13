@@ -61,6 +61,8 @@ private extension ContentView {
                 AppButton("Play", icon: Image.Icon.play, action: {})
                 AppButton("Info", icon: Image.Icon.info, variant: .secondary, action: {})
 
+                AppButton("Menyimpan...", icon: Image.Icon.add, variant: .secondary, isLoading: true, action: {})
+
                 AppButton("Disabled Primary", action: {})
                     .disabled(true)
 

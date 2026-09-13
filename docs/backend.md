@@ -16,12 +16,18 @@ Authorization: Bearer <Firebase ID Token>
 Token di-verify server-side. Kalau expired/invalid → `401 {"error":"unauthorized"}`.
 
 ### `POST /v1/auth/signin`
-Verify Firebase ID token, buat user Firestore kalau belum ada.
+Verifikasi Firebase ID token dari header, lalu **get-or-create user di Firestore**
+(`users/{uid}`) dari klaim token. Idempotent: sign-in berulang tidak bikin duplikat.
+User yang tersimpan: `uid`, `email`, `displayName`, `provider`, `createdAt`.
 
-Request:
+Request body **opsional** — nama hanya dipakai kalau token tidak punya klaim `name`
+(misal Sign in with Apple yang kadang tidak kirim nama):
 ```json
-{ "idToken": "<firebase-id-token>", "displayName": "optional" }
+{ "displayName": "optional" }
 ```
+Token tetap lewat header (`Authorization: Bearer <idToken>`), bukan body.
+Field `idToken` di body diterima tapi diabaikan.
+
 Response `200`:
 ```json
 {
@@ -29,6 +35,7 @@ Response `200`:
     "uid": "...",
     "email": "...",
     "displayName": "...",
+    "provider": "google.com",
     "createdAt": "ISO-8601"
   },
   "profiles": []

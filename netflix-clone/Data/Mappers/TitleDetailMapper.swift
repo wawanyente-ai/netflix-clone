@@ -5,58 +5,9 @@
 
 import Foundation
 
-// MARK: - Dummy DTO
-
-/// Data Transfer Object — matches `title_detail.json` structure (dummy fallback).
-struct TitleDetailDTO: Codable {
-    let id: String
-    let title: String
-    let year: String
-    let rating: String
-    let seasonCount: String
-    let synopsis: String
-    let episodes: [EpisodeDTO]
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, year, rating, synopsis, episodes
-        case seasonCount = "season_count"
-    }
-}
-
 // MARK: - Mapper
 
 enum TitleDetailMapper {
-
-    // MARK: - Dummy
-
-    /// Map dummy DTO → Domain Model (backward compat).
-    static func map(from dto: TitleDetailDTO) -> TitleDetail {
-        TitleDetail(
-            id: dto.id,
-            tmdbId: nil,
-            title: dto.title,
-            year: dto.year,
-            rating: dto.rating,
-            seasonCount: dto.seasonCount,
-            synopsis: dto.synopsis,
-            episodes: EpisodeMapper.map(from: dto.episodes),
-            posterPath: nil,
-            backdropPath: nil,
-            voteAverage: 0,
-            genres: [],
-            cast: [],
-            trailerKey: nil
-        )
-    }
-
-    /// Load dummy data from JSON file in bundle.
-    static func loadDummy() -> TitleDetail? {
-        guard let url = Bundle.main.url(forResource: "title_detail", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let dto = try? JSONDecoder().decode(TitleDetailDTO.self, from: data)
-        else { return nil }
-        return map(from: dto)
-    }
 
     // MARK: - TMDB Movie Detail → Domain
 

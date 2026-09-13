@@ -46,17 +46,4 @@ enum VideoService {
             posterURL: nil // ← tidak ada poster
         )
     ]
-
-    // MARK: - Trailer URL Builder
-
-    /// Build YouTube trailer URL from TMDB video key.
-    /// Returns a watchable YouTube URL for AVPlayer or WebView.
-    static func trailerURL(key: String) -> URL? {
-        URL(string: "https://www.youtube.com/watch?v=\(key)") // ← YouTube watch URL
-    }
-
-    /// Build YouTube embed URL for WebView display.
-    static func trailerEmbedURL(key: String) -> URL? {
-        URL(string: "https://www.youtube.com/embed/\(key)") // ← YouTube embed URL
-    }
 }

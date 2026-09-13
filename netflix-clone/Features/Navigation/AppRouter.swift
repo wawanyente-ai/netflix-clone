@@ -4,12 +4,17 @@
 //
 
 import SwiftUI
+import FirebaseAuth
 
 /// Central navigation state manager.
 /// Controls onboarding → main flow, stack navigation, auth session (guest vs
 /// signed-in), dan data backend (profil, riwayat).
 @Observable
 final class AppRouter {
+
+    // MARK: - Home Data (Persistent across tab switches)
+
+    var homeViewModel: HomeViewModelCached
 
     // MARK: - Onboarding
 
@@ -42,9 +47,19 @@ final class AppRouter {
     var continueWatching: [WatchProgressModel] = [] // ← lanjut tonton
     var mylistItems: [WatchlistItemModel] = [] // ← my list profil aktif
 
+    /// Media yang sedang di-toggle My List ("\(mediaType)-\(mediaId)"). Dipakai
+    /// buat loading state di tombol My List. Nil saat tidak ada proses.
+    var savingMyListId: String?
+
     /// Profil yang sedang dipilih.
     var currentProfile: UserProfile? {
         profiles.first { $0.profileId == selectedProfileId }
+    }
+
+    // MARK: - Init
+
+    init() {
+        self.homeViewModel = HomeViewModelCached()
     }
 
     /// Fitur lock: jalankan `action` kalau sudah login; kalau belum, buka sheet
@@ -76,7 +91,9 @@ final class AppRouter {
         do {
             let token = try await AuthService.signInWithGoogle() // ← Google Sign-In
             BackendConfig.idToken = token // ← simpan Firebase ID token
-            await signIn() // ← POST /v1/auth/signin → user + profiles
+            // ← kirim nama dari Firebase sebagai fallback displayName
+            let firebaseName = Auth.auth().currentUser?.displayName
+            await signIn(preferredName: firebaseName) // ← POST /v1/auth/signin → user + profiles
             return isSignedIn
         } catch {
             // ← Google sign-in gagal: tetap guest, kasih kesempatan retry
@@ -86,21 +103,28 @@ final class AppRouter {
         }
     }
 
-    /// RESTORE session pas app dibuka: flag sudah true (persist), fetch ulang
-    /// user + profiles dari backend untuk validasi.
+    /// RESTORE session pas app dibuka: pulihkan user+profiles dari cache lokal
+    /// (biar login instan + bisa offline), lalu refresh dari backend.
     func restoreSessionIfNeeded() {
         if let kept = UserDefaults.standard.string(forKey: "selectedProfileId") {
             selectedProfileId = kept // ← pulihkan profil persist
         }
+        // ← hydrate cache: info user tidak hilang pas app dibuka ulang
+        if loadCachedSession() {
+            if selectedProfileId == nil || !profiles.contains(where: { $0.profileId == selectedProfileId }) {
+                selectedProfileId = profiles.first?.profileId
+            }
+            withAnimation { isSignedIn = true }
+        }
         guard isSignedIn else { return }
-        Task { await signIn() }
+        Task { await signIn() } // ← refresh background: validasi token + sinkron profil
     }
 
     /// POST /v1/auth/signin → simpan user+profiles. Kalau belum ada profil, buat
-    /// "Profil 1" (Netflix-style default).
-    func signIn() async {
+    /// profil default bernama displayName user (fallback "Profil 1").
+    func signIn(preferredName: String? = nil) async {
         do {
-            let res = try await BackendService.signIn()
+            let res = try await BackendService.signIn(displayName: preferredName)
             backendUser = res.user
             profiles = res.profiles
 
@@ -110,22 +134,29 @@ final class AppRouter {
             if kept != nil {
                 // ← profil aktif dipertahankan
             } else if res.profiles.isEmpty {
-                let created = try await BackendService.createProfile(name: "Profil 1")
+                // ← nama profil default dari display name user, bukan hardcoded
+                let name = Self.defaultProfileName(displayName: res.user.displayName, email: res.user.email)
+                let created = try await BackendService.createProfile(name: name)
                 profiles = [created]
                 selectedProfileId = created.profileId
             } else {
                 selectedProfileId = res.profiles.first?.profileId
             }
             persistSelectedProfile()
+            saveCachedSession() // ← simpan info user + profil ke lokal
 
             withAnimation { isSignedIn = true }
             await loadNetflixSaya()
             pendingAction?()
             pendingAction = nil
         } catch {
-            // ← backend offline / gagal: tetap guest, kasih kesempatan retry
-            isSignedIn = false
-            resetSession()
+            if case BackendError.unauthorized = error {
+                // ← token invalid/expired: logout bersih (flag + token + cache)
+                isSignedIn = false
+                resetSession()
+            } else {
+                // ← backend offline: biarkan session dari cache tetap login
+            }
         }
     }
 
@@ -144,93 +175,72 @@ final class AppRouter {
         mylistItems = []
         pendingAction = nil
         BackendConfig.idToken = nil
+        UserDefaults.standard.removeObject(forKey: Self.cachedUserKey)
+        UserDefaults.standard.removeObject(forKey: Self.cachedProfilesKey)
     }
 
-    private func persistSelectedProfile() {
+    // MARK: - Local Session Cache
+
+    private static let cachedUserKey = "cachedBackendUser"
+    private static let cachedProfilesKey = "cachedProfiles"
+
+    /// Simpan user + profiles ke UserDefaults (JSON). Dipanggil tiap sign-in
+    /// sukses; supaya info user tersimpan di perangkat, bukan cuma di memori.
+    private func saveCachedSession() {
+        let d = UserDefaults.standard
+        if let user = backendUser, let data = try? JSONEncoder().encode(user) {
+            d.set(data, forKey: Self.cachedUserKey)
+        }
+        if let data = try? JSONEncoder().encode(profiles) {
+            d.set(data, forKey: Self.cachedProfilesKey)
+        }
+    }
+
+    /// Muat user + profiles dari cache lokal. Returns false kalau belum pernah
+    /// sign-in atau cache kosong.
+    private func loadCachedSession() -> Bool {
+        let d = UserDefaults.standard
+        guard let userData = d.data(forKey: Self.cachedUserKey),
+              let user = try? JSONDecoder().decode(BackendUser.self, from: userData),
+              let profilesData = d.data(forKey: Self.cachedProfilesKey),
+              let cachedProfiles = try? JSONDecoder().decode([UserProfile].self, from: profilesData)
+        else { return false }
+        backendUser = user
+        profiles = cachedProfiles
+        return true
+    }
+
+    /// Nama profil default saat user baru belum punya profil: displayName user,
+    /// lalu fallback nama dari email ("dewi.maya@gmail.com" → "Dewi Maya"),
+    /// terakhir "Profil 1". Dibatasi 30 karakter (= MaxProfileNameLen).
+    private static func defaultProfileName(displayName: String, email: String) -> String {
+        let fromDisplay = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !fromDisplay.isEmpty {
+            return String(fromDisplay.prefix(30))
+        }
+        let fromEmail = nameFromEmail(email)
+        if !fromEmail.isEmpty {
+            return String(fromEmail.prefix(30))
+        }
+        return "Profil 1"
+    }
+
+    /// "dewi.maya@gmail.com" → "Dewi Maya". Pemisah: titik, underscore, dash.
+    private static func nameFromEmail(_ email: String) -> String {
+        let prefix = email.split(separator: "@").first.map(String.init) ?? email
+        let words = prefix
+            .split { $0 == "." || $0 == "_" || $0 == "-" }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { word -> String in
+                guard let first = word.first else { return String(word) }
+                return String(first).uppercased() + word.dropFirst().lowercased()
+            }
+        return words.joined(separator: " ")
+    }
+
+    func persistSelectedProfile() {
         UserDefaults.standard.set(selectedProfileId, forKey: "selectedProfileId")
-    }
-
-    // MARK: - Netflix Saya Data
-
-/// Load profil + riwayat + continue watching + my list untuk Netflix Saya & Home.
-    func loadNetflixSaya() async {
-        guard let profile = currentProfile else { return }
-        // ← load history + progress + mylist secara parallel
-        async let historyFetch = BackendService.history(profileId: profile.profileId)
-        async let progressFetch = BackendService.progress(profileId: profile.profileId)
-        async let watchlistFetch = BackendService.watchlist(profileId: profile.profileId)
-        do {
-            let (history, progress, mylist) = try await (historyFetch, progressFetch, watchlistFetch)
-            historyEntries = history
-            continueWatching = progress
-            mylistItems = mylist
-        } catch {
-            historyEntries = [] // ← backend offline: biarkan kosong
-            continueWatching = []
-            mylistItems = []
-        }
-    }
-
-    func selectProfile(_ profileId: String) {
-        selectedProfileId = profileId
-        persistSelectedProfile()
-        Task { await loadNetflixSaya() } // ← muat ulang riwayat profil baru
-    }
-
-    // MARK: - Gated Actions
-
-    /// My List toggle untuk hero Home (butuh login + profil aktif).
-    func toggleHeroMyList() async {
-        guard let profile = currentProfile, let item = selectedMediaItem else { return }
-        _ = try? await BackendService.toggleMyList(
-            profileId: profile.profileId,
-            mediaType: item.mediaType.rawValue,
-            mediaId: item.id,
-            title: item.title,
-            posterPath: item.posterPath ?? "" // ← path TMDB opsional
-        )
-        // ← refresh my list setelah toggle
-        if let updated = try? await BackendService.watchlist(profileId: profile.profileId) {
-            mylistItems = updated
-        }
-    }
-
-    /// Download (butuh login + profil). Belum ada storage offline; stub sampai
-    /// fitur download terisi (lihat docs/auth-gating.md).
-    func downloadCurrentTitle() async {
-        // TODO: simpan ke local storage + daftarkan di profil downloads.
-    }
-
-    /// Save playback progress ke backend (Continue Watching). Butuh login.
-    @MainActor
-    func saveProgress(position: Double, duration: Double) async {
-        guard let profile = currentProfile, let item = selectedMediaItem else { return }
-        _ = try? await BackendService.saveProgress(
-            profileId: profile.profileId,
-            mediaType: item.mediaType.rawValue,
-            mediaId: item.id,
-            position: position,
-            duration: duration,
-            title: item.title,
-            posterPath: item.posterPath ?? ""
-        )
-    }
-
-    /// Catat tontonan ke riwayat (POST history). Dipanggil sekali per video mulai play.
-    @MainActor
-    func logWatchHistory() async {
-        guard let profile = currentProfile, let item = selectedMediaItem else { return }
-        _ = try? await BackendService.logHistory(
-            profileId: profile.profileId,
-            mediaType: item.mediaType.rawValue,
-            mediaId: item.id,
-            title: item.title,
-            posterPath: item.posterPath ?? ""
-        )
-        // ← refresh riwayat supaya langsung tampil
-        if let updated = try? await BackendService.history(profileId: profile.profileId) {
-            historyEntries = updated
-        }
     }
 
     // MARK: - Tab Selection
@@ -252,91 +262,6 @@ final class AppRouter {
 
     func completeOnboarding() {
         withAnimation { onboardingComplete = true }
-    }
-
-    func navigateToTitleDetail(from tab: NavigationBar.Tab) {
-        switch tab {
-        case .home:
-            homePath.append(NavigationRoute.titleDetail)
-        case .klip:
-            klipPath.append(NavigationRoute.titleDetail)
-        case .search:
-            searchPath.append(NavigationRoute.titleDetail)
-        case .downloads:
-            downloadsPath.append(NavigationRoute.titleDetail)
-        }
-    }
-
-    func navigateToVideoPlayer(from tab: NavigationBar.Tab) {
-        switch tab {
-        case .home:
-            homePath.append(NavigationRoute.videoPlayer)
-        case .klip:
-            klipPath.append(NavigationRoute.videoPlayer)
-        case .search:
-            searchPath.append(NavigationRoute.videoPlayer)
-        case .downloads:
-            downloadsPath.append(NavigationRoute.videoPlayer)
-        }
-    }
-
-    func navigateToMyList() {
-        downloadsPath.append(NavigationRoute.myList) // ← push My List page di tab downloads
-    }
-
-    /// Buka detail dari item My List. MediaItem dibuat minimal karena yg dipakai
-    /// detail page cuma mediaType + mediaId (+ title untuk fallback).
-    func openMyListDetail(_ item: WatchlistItemModel) {
-        selectedMediaItem = MediaItem(
-            id: item.mediaId,
-            title: item.title,
-            overview: "",
-            posterPath: item.posterPath.isEmpty ? nil : item.posterPath,
-            backdropPath: nil,
-            voteAverage: 0,
-            releaseDate: "",
-            mediaType: item.mediaType == "tv" ? .tv : .movie,
-            genreIds: [],
-            runtime: nil
-        )
-        downloadsPath.append(NavigationRoute.titleDetail)
-    }
-
-    /// Hapus item dari My List lalu refresh.
-    func removeFromMyList(_ item: WatchlistItemModel) async {
-        guard let profile = currentProfile else { return }
-        _ = try? await BackendService.toggleMyList(
-            profileId: profile.profileId,
-            mediaType: item.mediaType,
-            mediaId: item.mediaId,
-            title: item.title,
-            posterPath: item.posterPath
-        )
-        if let updated = try? await BackendService.watchlist(profileId: profile.profileId) {
-            mylistItems = updated
-        }
-    }
-
-    func popToRoot(from tab: NavigationBar.Tab) {
-        switch tab {
-        case .home:
-            homePath = NavigationPath()
-        case .klip:
-            klipPath = NavigationPath()
-        case .search:
-            searchPath = NavigationPath()
-        case .downloads:
-            downloadsPath = NavigationPath()
-        }
-    }
-
-    /// Reset semua path saat ganti tab — kembali ke halaman utama tiap tab.
-    func popAllTabs() {
-        homePath = NavigationPath()
-        klipPath = NavigationPath()
-        searchPath = NavigationPath()
-        downloadsPath = NavigationPath()
-        selectedMediaItem = nil
     }
 }
 
