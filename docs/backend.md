@@ -86,6 +86,7 @@ Response `200`:
 | Method | Path |
 |---|---|
 | POST | `/v1/notifications/device/register` — `{ "fcmToken": "...", "platform": "ios" }` |
+| DELETE | `/v1/notifications/device/{fcmToken}` — unregister |
 | GET | `/v1/notifications` |
 | PATCH | `/v1/notifications/{id}/read` |
 

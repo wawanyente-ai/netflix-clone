@@ -7,7 +7,7 @@
 
 - **Platform:** iOS (SwiftUI) + Go backend + Firebase
 - **Architecture:** Monorepo
-- **iOS progress:** 7/7 pages implemented (Home, Search, Klip, TitleDetail, VideoPlayer, NetflixSaya, Onboarding+MyList). Home/Search/Detail real TMDB via backend proxy; Klip real data; Continue Watching rail + MyList wire; NetflixSaya history/mylist real; Google Sign-In di-wire (Apple placeholder).
+- **iOS progress:** 7/7 pages implemented (Home, Search, Klip, TitleDetail, VideoPlayer, NetflixSaya, Onboarding+MyList). Home/Search/Detail real TMDB via backend proxy; Klip 5 fixed clips (static, reverted from proxy); Continue Watching rail + MyList wire; NetflixSaya history/mylist real; Google Sign-In di-wire (Apple placeholder).
 - **UI Auth rules:** onboarding wajib → guest mode; fitur personal di-gate (docs/auth-gating.md)
 - **Backend progress:** API Fase 1–8 selesai, **jalan lokal** (bukan cloud) dengan service account `netflix-clone-db400`
 - **CI/CD:** GitHub Actions ditambahkan — `backend.yml` (build/vet/test + docker), `ios.yml` (build sim + unit test, pakai `GoogleService-Info.ci.plist` stub), `deploy.yml` (Cloud Run, aktif saat secrets `GCP_PROJECT_ID`/`GCP_SA_KEY`/`TMDB_TOKEN` di-set)
@@ -142,6 +142,7 @@ POST /v1/profiles/{id}/history
 POST   /v1/notifications/device/register     # upsert FCM token
 GET    /v1/notifications
 PATCH  /v1/notifications/{id}/read
+DELETE /v1/notifications/device/{fcmToken}   # unregister device
 ```
 Trigger: Cloud Scheduler job → cek TMDB episode baru dari mylist → kirim FCM.
 
@@ -149,7 +150,7 @@ Trigger: Cloud Scheduler job → cek TMDB episode baru dari mylist → kirim FCM
 ```
 GET /v1/content/trending?time_window=week
 GET /v1/content/{movie|tv}/{id}
-GET /v1/content/search?q=
+GET /v1/content/search?query=
 GET /v1/content/genres
 GET /v1/content/discover?genre=&sort=
 ```
@@ -220,28 +221,6 @@ Status: **done** (cron di Fase 7)
 Status: **done**
 - [ ] DEPLOY pending kredensial user: seed catalog, deploy cron service + Cloud Scheduler, tmdb token env
 
-### Fase 4 — My List + Continue Watching
-- [ ] My List CRUD API
-- [ ] Progress (continue watching) API
-- [ ] iOS: MyListPage baru + hook tombol MyList di Home/Klip/detail
-Status: pending
-
-### Fase 5 — Watch History + Home Rail
-- [ ] History API (paginated)
-- [ ] iOS: riwayat section di NetflixSayaPage jadi real
-Status: pending
-
-### Fase 6 — Notifications (FCM)
-- [ ] Device register endpoint + Cloud Scheduler job
-- [ ] iOS: request push permission, handle open URL
-Status: pending
-
-### Fase 7 — TMDB Proxy + Streaming
-- [ ] Pindahin TMDB token dari iOS APIConfig.swift ke env Go
-- [ ] iOS ganti networking ke backend
-- [ ] Video catalog API + HLS stream ke player
-Status: pending
-
 ### Fase 8 — iOS Integrasi (real sign-in + proxy di-wire)
 - [x] **Backend jalan lokal**: `backend/.env` (project `netflix-clone-db400`, service account, TMDB token), `make seed` sukses, smoke test semua endpoint
 - [x] Dev bypass fix: `ALLOW_UNAUTHENTICATED_DEV=true` → synthetic token `dev-user`/`dev@local` (login status di `UserDefaults[isSignedIn]`)
@@ -255,7 +234,7 @@ Status: pending
 - [x] **Continue Watching**: `onProgressSave` di-wire ke `saveProgress` (3x VideoPlayerPage), rail "Lanjutkan Tonton" di Home (TitleCard `.continueWatching`)
 - [x] **MyListPage** baru + hook dari NetflixSaya (Lihat Semua) + refresh setelah toggle
 - [x] **NetflixSayaPage** → my list + progress real (download tetap placeholder)
-- [x] **KlipPage** → trending real via proxy (bukan dummy)
+- [x] **KlipPage** → 5 fixed clips (static, reverted from proxy)
 - [ ] Sign in with Apple (belum; user prioritas Google)
 - [ ] Push notification handling iOS
 Describe: progress test `550 Fight Club` seeded di profil Ahmad (untuk demo Continue Watching + My List)
@@ -265,11 +244,11 @@ Status: **done** (deploy cloud & push notif pending)
 
 ## iOS Issues Konteks (dari audit sebelumnya)
 
-- TMDB token hardcoded di `netflix-clone/Core/Network/APIConfig.swift` — harus pindah ke backend
-- KlipPage pakai dummy data, action buttons kosong
-- NetflixSayaPage semua placeholder
-- Onboarding auth fake (Google/Apple icon stand-in)
-- QualityBadge / RatingBadge / continueWatching / category sheet belum dipakai di halaman
+- ~~TMDB token hardcoded di `netflix-clone/Core/Network/APIConfig.swift`~~ — resolved: token DIHAPUS, semua request lewat backend proxy
+- ~~KlipPage pakai dummy data, action buttons kosong~~ — partially resolved: action buttons wired, KlipPage 5 fixed clips (static, reverted from proxy pending future work)
+- ~~NetflixSayaPage semua placeholder~~ — resolved: my list + history real from backend
+- ~~Onboarding auth fake (Google/Apple icon stand-in)~~ — resolved: Google real via Firebase, Apple placeholder
+- QualityBadge / RatingBadge / continueWatching / category sheet belum dipakai di halaman — remaining
 - `TitleCard` kebab dots, `TopTenBadge`, `ContentBadge` sudah tersedia di DesignSystem
 
 ---

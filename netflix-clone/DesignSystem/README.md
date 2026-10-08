@@ -22,6 +22,8 @@ DesignSystem/
     │       ├── PosterImage.swift
     │       ├── ShimmerView.swift
     │       └── TopTenBadge.swift
+    ├── Images/
+    │   └── CachedAsyncImage.swift
     ├── ButtonAndTabs/
     │   └── Molecules/
     │       ├── AppButton.swift
@@ -42,7 +44,12 @@ DesignSystem/
     │       └── NavigationBar.swift
     ├── TitleCards/
     │   ├── Molecules/
-    │   │   └── TitleCard.swift
+    │   │   ├── KebabDots.swift
+    │   │   ├── TitleCard.swift
+    │   │   ├── TitleCard+Poster.swift
+    │   │   ├── TitleCard+Shared.swift
+    │   │   ├── TitleCard+TopSearch.swift
+    │   │   └── TitleCardMetrics.swift
     │   └── Organisms/
     │       ├── ContentRow.swift
     │       └── TopSearchRow.swift

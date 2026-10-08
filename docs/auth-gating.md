@@ -49,4 +49,7 @@ Backend server (Go, `backend/`) butuh ID token Firebase untuk semua route `/v1/*
 - Profil default user baru = `displayName` user (bukan hardcoded).
 - Signed-in state tidak semata flag: `restoreSessionIfNeeded` me-refresh session + fallback cache.
 
-## Tantangan Ke Depan (Fase 8)
+## Catatan Auth
+
+- **Google Sign-In** sudah real (Firebase + GoogleSignIn SDK). **Sign in with Apple** masih placeholder (belum).
+- `AuthSheetView` menampilkan opsi Google (real) + Apple (placeholder, prioritas rendah — user utama pakai Google).

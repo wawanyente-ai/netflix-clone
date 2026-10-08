@@ -26,8 +26,11 @@ Rules of thumb:
 ├── App/                    # App entry point
 ├── Core/                   # Shared utilities (network, extensions)
 ├── Data/
-│   ├── Dummy/              # JSON dummy files for development
-│   └── Mappers/            # DTO ↔ Domain Model mapping
+│   ├── DTOs/               # Response models matching API JSON
+│   ├── Mappers/            # DTO ↔ Domain Model mapping
+│   ├── Persistence/        # Local cache (MovieCache, ImageCacheManager)
+│   ├── Repositories/       # Repository + SWR cache logic (MovieRepository)
+│   └── Services/           # API methods (BackendService, TMDBService, VideoService)
 ├── Domain/
 │   └── Models/             # Pure data models (Codable, Identifiable)
 ├── Features/
@@ -40,10 +43,9 @@ Rules of thumb:
 
 **Rules:**
 - **Models** live in `Domain/Models/`. They are plain structs, no SwiftUI imports.
-- **DTOs** (Data Transfer Objects) live in `Data/Mappers/` alongside their mapper. They match JSON structure with `CodingKeys`.
-- **Mappers** convert DTO → Domain Model. When API changes, only mapper logic updates.
+- **DTOs** (Data Transfer Objects) live in `Data/DTOs/`. They match JSON structure with `CodingKeys`.
+- **Mappers** live in `Data/Mappers/` and convert DTO → Domain Model. When API changes, only mapper logic updates.
 - **Never consume JSON directly in Views.** Always: JSON → DTO → Mapper → Domain Model → ViewModel → View.
-- **Dummy data** lives in `Data/Dummy/` as JSON files. Load via `Mapper.loadDummy()` for previews/development.
 - **Style comments:** every metric, color, font, spacing, padding should have `// ←` comment explaining what it controls. Example:
   ```swift
   .font(.Typography.Medium.label3)           // ← ubah ukuran/weight font
@@ -56,4 +58,3 @@ Rules of thumb:
 - **ViewModels** live in `Features/ViewModels/`. One `@Observable` class per page. Load dummy data in `init()`.
 - **Pages** live in `Features/Pages/`. Composed from DesignSystem components only. Never import UIKit or use raw colors/fonts.
 - **Navigation** is centralized in `Features/Navigation/AppRouter.swift`. Pages receive closures for navigation actions, never push directly.
-- **Dummy data flow:** `Data/Dummy/*.json` → `Data/Mappers/*Mapper.swift` (DTO → Domain Model) → `ViewModel.loadDummy()` → `View`.

@@ -25,14 +25,14 @@ Flow data: `TMDB API → DTO → Mapper → Domain Model → ViewModel → View`
 | Folder | Purpose | Contoh |
 |---|---|---|
 | `App/` | Entry point | `netflix_cloneApp.swift` |
-| `Core/Network/` | API client, config | `APIClient.swift`, `APIConfig.swift` |
+| `Core/Network/` | API client, config | `BackendClient.swift`, `BackendConfig.swift`, `APIConfig.swift` |
 | `Data/DTOs/` | TMDB response structs | `MovieDTO.swift` |
 | `Data/Mappers/` | DTO → Model conversion | `MediaItemMapper.swift` |
 | `Data/Services/` | API methods | `TMDBService.swift` |
 | `Domain/Models/` | Pure data models | `MediaItem.swift` |
 | `Features/Navigation/` | Central nav state | `AppRouter.swift` |
 | `Features/Pages/` | Screen views | `HomePage.swift` |
-| `Features/ViewModels/` | State + logic | `HomeViewModel.swift` |
+| `Features/ViewModels/` | State + logic | `HomeViewModel+Cached.swift` |
 | `DesignSystem/` | UI tokens + components | `Colors.swift`, `AppButton.swift` |
 
 ---
@@ -73,10 +73,15 @@ final class AppRouter {
 
 ### API Config (`Core/Network/APIConfig.swift`)
 
+Semua request data API lewat backend proxy (`/v1/content/...`) — token TMDB **tidak pernah** ada di binary iOS. `APIConfig` cuma menyimpan konstanta CDN gambar TMDB:
+
 ```swift
 enum APIConfig {
-    static let tmdbBaseURL = "https://api.themoviedb.org/3"
-    static let accessToken = "YOUR_TOKEN_HERE" // ← ganti di sini
+    static let tmdbImageBaseURL = "https://image.tmdb.org/t/p/"
+    enum ImageSize {
+        static let poster = "w500"
+        static let backdrop = "w1280"
+    }
 }
 ```
 
@@ -84,8 +89,7 @@ enum APIConfig {
 
 ```swift
 actor TMDBService {
-    static let shared = TMDBService()
-
+    // Semua method hit backend proxy via BackendClient, BUKAN TMDB langsung.
     func fetchTrending() async throws -> [MultiSearchResultDTO]
     func fetchPopularMovies() async throws -> [MovieDTO]
     func searchMulti(query: String) async throws -> [MultiSearchResultDTO]
@@ -106,6 +110,7 @@ func loadData() async {
     movies = MediaItemMapper.fromMovies(dtos)
 }
 ```
+> Catatan: Home memakai `HomeViewModelCached` (SWR + cache), bukan load langsung tiap muncul. Detail di `PRODUCTION_CACHING_IMPLEMENTATION.md`.
 
 ### 2. DTO (Data Transfer Object)
 
@@ -153,7 +158,7 @@ Consumes ViewModel:
 
 ```swift
 struct HomePage: View {
-    @State private var viewModel = HomeViewModel()
+    @State private var viewModel = HomeViewModelCached()
 
     var body: some View {
         ForEach(viewModel.popularMovies) { item in
@@ -248,7 +253,7 @@ NavigationStack(path: $router.homePath) {
 ### Check API calls
 
 ```swift
-// Add to APIClient.swift
+// Add to BackendClient.swift
 print("Request: \(request.url!)")
 print("Response: \(String(data: data, encoding: .utf8)!)")
 ```

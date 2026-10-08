@@ -40,8 +40,9 @@ netflix-clone/
 ├── Core/Network/           # BackendClient, BackendConfig, APIConfig (image sizes)
 ├── Data/
 │   ├── DTOs/               # Response models
-│   ├── Dummy/              # JSON dummy data (previews)
 │   ├── Mappers/            # DTO → Domain Model mapping
+│   ├── Persistence/        # Local cache (MovieCache, ImageCacheManager)
+│   ├── Repositories/       # Repository + SWR cache logic (MovieRepository)
 │   └── Services/           # BackendService, TMDBService, VideoService
 ├── Domain/Models/          # Pure data models
 ├── Features/
@@ -105,7 +106,7 @@ See [`DesignSystem/README.md`](DesignSystem/README.md) for the complete referenc
 All TMDB calls go through the backend proxy — the app only holds image URLs + proxy paths:
 
 - `GET /v1/content/trending?time_window=week` — trending content
-- `GET /v1/content/search?q=` — global search
+- `GET /v1/content/search?query=` — global search
 - `GET /v1/content/{movie|tv}/{id}` — detail (+ videos/recommendations/seasons)
 - `GET /v1/content/discover?genre=&sort=` — genre filtering
 - `GET /v1/videos` — streaming catalog

@@ -299,7 +299,7 @@ struct MediaItem: Identifiable {
 
 // ViewModel
 @Observable
-class HomeViewModel {
+class HomeViewModelCached {
     var items: [MediaItem] = []
 
     func load() async {
@@ -309,7 +309,7 @@ class HomeViewModel {
 
 // View
 struct HomePage: View {
-    @State private var viewModel = HomeViewModel()
+    @State private var viewModel = HomeViewModelCached()
 
     var body: some View {
         ForEach(viewModel.items) { item in
@@ -335,7 +335,7 @@ async let tvShows = service.fetchTVShows()
 let (m, t) = try await (movies, tvShows)
 ```
 
-**Di project ini:** `HomeViewModel.loadData()` fetch semua data parallel.
+**Di project ini:** `HomeViewModelCached.loadData()` fetch semua data parallel.
 
 ### Design Tokens
 
