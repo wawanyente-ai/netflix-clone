@@ -7,6 +7,19 @@ Go + chi + Firebase (Auth, Firestore). Deploy: Cloud Run (asia-southeast2).
 Production: `https://<service-name>-<hash>.a.run.app` (set after `make deploy`)
 Local: `http://localhost:8080`
 
+## Health Check
+
+Tidak butuh auth, dipakai CI/uptime check:
+
+| Method | Path |
+|---|---|
+| GET | `/healthz` |
+| GET | `/v1/healthz` |
+
+```bash
+curl http://localhost:8080/healthz
+```
+
 ## Auth
 
 Every request (except `/healthz`) needs:

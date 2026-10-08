@@ -97,15 +97,7 @@ ImageCacheManager
 
 ### Tests
 
-7. **`netflix-cloneTests/MovieRepositoryTests.swift`** (200+ lines)
-   - `MockTMDBService`: for testing without network
-   - `MockLocalDataSource`: for testing cache logic
-   - Test cases:
-     - Fresh cache returns without network request
-     - No cache triggers network request
-     - Force refresh always hits network
-     - Cache persists data across calls
-     - TTL validation (structure in place)
+7. **`docs/development.md`** — verifikasi build + unit test aktif (backend). File `MovieRepositoryTests.swift` dihapus: mock-nya mencoba mewarisi `TMDBService`/`LocalMovieDataSource` yang actor konkret (invalid di Swift), tidak pernah compile, dan CI tidak menjalankan unit test iOS.
 
 ---
 
@@ -332,31 +324,15 @@ let (trending, popular, topRated, popularTV) = try await (
 
 ## Testing
 
-### Test Coverage
+Perilaku SWR ini sudah diuji secara manual: first launch (no cache), refresh jaringan, force refresh via pull-to-refresh, dan kondisi offline. Unit test otomatis iOS (`MovieRepositoryTests.swift`) tidak berlanjut — mock-nya invalid (mewarisi actor konkret) sehingga tidak pernah compile; CI juga tidak menjalankan unit test iOS. Untuk cakupan otomatis aktif silakan lihat unit test backend di [`docs/development.md`](development.md).
 
-1. **Fresh Cache Behavior**
-   - Returns cached data without network call
-   - Verified via mock service call count
-
-2. **No Cache Behavior**
-   - Triggers 4 parallel network requests
-   - Data populated correctly
-
-3. **Force Refresh**
-   - Bypasses TTL
-   - Always hits network
-
-4. **Cache Persistence**
-   - Data survives app reopening
-   - Verified across multiple calls
-
-### Running Tests
+### Build Verification
 
 ```bash
 xcodebuild -project netflix-clone.xcodeproj \
   -scheme netflix-clone \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
-  test
+  build
 ```
 
 ---
@@ -416,8 +392,7 @@ xcodebuild -project netflix-clone.xcodeproj \
 - [x] Create image caching (`ImageCacheManager.swift`)
 - [x] Build cached image component (`CachedAsyncImage.swift`)
 - [x] Update ViewModel for SWR (`HomeViewModel+Cached.swift`)
-- [x] Update HomeView (`HomePage.swift`)
-- [x] Add tests (`MovieRepositoryTests.swift`)
+- [x] Update HomePage.swift
 - [x] Verify build succeeds
 - [x] Manual testing: first launch, refresh, offline
 - [x] Code review for production readiness
@@ -469,7 +444,6 @@ xcodebuild -project netflix-clone.xcodeproj \
 - [x] ViewModel does not directly access URLSession/SwiftData
 - [x] Repository abstracts local and remote data sources
 - [x] Network failures do not destroy cached UI
-- [x] Tests cover cache, TTL, refresh, and error behavior
 - [x] Existing UI/design system remains intact
 - [x] Project builds successfully
 - [x] App runs on simulator

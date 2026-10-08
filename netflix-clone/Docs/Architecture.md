@@ -110,7 +110,7 @@ func loadData() async {
     movies = MediaItemMapper.fromMovies(dtos)
 }
 ```
-> Catatan: Home memakai `HomeViewModelCached` (SWR + cache), bukan load langsung tiap muncul. Detail di `PRODUCTION_CACHING_IMPLEMENTATION.md`.
+> Catatan: Home memakai `HomeViewModelCached` (SWR + cache), bukan load langsung tiap muncul. Detail di [`docs/caching.md`](../../docs/caching.md).
 
 ### 2. DTO (Data Transfer Object)
 

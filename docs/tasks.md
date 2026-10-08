@@ -10,7 +10,7 @@
 - **iOS progress:** 7/7 pages implemented (Home, Search, Klip, TitleDetail, VideoPlayer, NetflixSaya, Onboarding+MyList). Home/Search/Detail real TMDB via backend proxy; Klip 5 fixed clips (static, reverted from proxy); Continue Watching rail + MyList wire; NetflixSaya history/mylist real; Google Sign-In di-wire (Apple placeholder).
 - **UI Auth rules:** onboarding wajib → guest mode; fitur personal di-gate (docs/auth-gating.md)
 - **Backend progress:** API Fase 1–8 selesai, **jalan lokal** (bukan cloud) dengan service account `netflix-clone-db400`
-- **CI/CD:** GitHub Actions ditambahkan — `backend.yml` (build/vet/test + docker), `ios.yml` (build sim + unit test, pakai `GoogleService-Info.ci.plist` stub), `deploy.yml` (Cloud Run, aktif saat secrets `GCP_PROJECT_ID`/`GCP_SA_KEY`/`TMDB_TOKEN` di-set)
+- **CI/CD:** GitHub Actions ditambahkan — `backend.yml` (build/vet/test + docker), `ios.yml` (build tanpa signing, pakai `GoogleService-Info.ci.plist` stub), `deploy.yml` (Cloud Run, aktif saat secrets `GCP_PROJECT_ID`/`GCP_SA_KEY`/`TMDB_TOKEN` di-set) — detail [`docs/deployment.md`](deployment.md)
 
 ---
 

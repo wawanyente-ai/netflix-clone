@@ -59,7 +59,7 @@ netflix-clone/
 
 - Xcode 15+
 - iOS 17+ simulator (build target: **iPhone 17**)
-- Go 1.22+ (backend)
+- Go 1.26+ (backend, lihat [`backend/README.md`](../backend/README.md))
 - Running backend locally with a TMDB access token + Firebase service account (see [`backend/`](../backend))
 
 ### Setup
@@ -73,7 +73,7 @@ netflix-clone/
    make run                    # API di http://localhost:8080
    ```
 3. Open `netflix-clone.xcodeproj`.
-4. Add `GoogleService-Info.plist` (Firebase project `netflix-clone-db400`) to the `netflix-clone` target.
+4. Add `GoogleService-Info.plist` to the `netflix-clone/` folder (gitignored; CI uses the committed `GoogleService-Info.ci.plist` stub).
 5. Build & Run (Cmd+R) on iPhone 17 simulator.
 6. Optional: set `BackendBaseURL` in `Info.plist` to point the app at a deployed backend; defaults to `http://localhost:8080`.
 
@@ -100,6 +100,8 @@ See [`DesignSystem/README.md`](DesignSystem/README.md) for the complete referenc
 
 - [`Docs/SwiftAndSwiftUI.md`](Docs/SwiftAndSwiftUI.md) — Swift & SwiftUI basics
 - [`Docs/Architecture.md`](Docs/Architecture.md) — MVVM architecture guide
+- [`../docs/caching.md`](../docs/caching.md) — SWR caching + image cache di app ini
+- [`../docs/README.md`](../docs/README.md) — index semua docs monorepo
 
 ## API Reference
 
